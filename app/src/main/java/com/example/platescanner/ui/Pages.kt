@@ -3,8 +3,7 @@ package com.example.platescanner.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -37,15 +36,15 @@ internal val LineColor = Color.White.copy(alpha = 0.14f)
 internal val FieldColor = Color.White.copy(alpha = 0.06f)
 
 /**
- * A full-screen page that slides in over the camera. The camera stays composed underneath,
+ * A full-screen page that fades in over the camera. The camera stays composed underneath,
  * so recording keeps running while a page is open.
  */
 @Composable
 fun FullPage(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInHorizontally { it } + fadeIn(),
-        exit = slideOutHorizontally { it } + fadeOut(),
+        enter = fadeIn(tween(150)),
+        exit = fadeOut(tween(150)),
     ) {
         Surface(Modifier.fillMaxSize(), color = PageColor, contentColor = Color.White) {
             Column(
