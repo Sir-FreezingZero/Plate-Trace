@@ -104,10 +104,10 @@ private val PillBg = Color.White.copy(alpha = 0.08f)
 
 /**
  * Geometry: every control in a card (slider thumb, number box, switch, selector, buttons) is a
- * 22dp pill or circle (radius 11dp) and rows are padded [CardPad] (8dp) on all sides. Cards use
- * 12dp corners (squarer than the strictly concentric 11 + 8 = 19dp, by choice).
+ * 22dp pill or circle (radius 11dp), rows are padded [CardPad] (8dp) on all sides, and the card's
+ * corner radius is 11 + 8 = 19dp — so a control in a card's corner is concentric with it.
  */
-private val CardShape = RoundedCornerShape(12.dp)
+private val CardShape = RoundedCornerShape(ControlRadius + CardPad)
 
 /** Slider with a round thumb the same height as the other controls (22dp). */
 @OptIn(ExperimentalMaterial3Api::class)
