@@ -130,104 +130,74 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
 private fun LiveBox.key(index: Int) = savedText ?: text ?: "box$index"
 
 /**
- * The plate box with a header strip joined to its top edge, exactly as wide as the box:
- * the plate number centred (shrunk to fit), a ✓ once saved or ?/✕ when rejected, and a thin
- * bar along the bottom of the header that fills as matching readings come in.
+ * Plate box with two strips, as wide as the box and joined to it:
+ * - top: the plate number read in this frame;
+ * - bottom: "2/3" (matching readings so far / needed), or the saved text once saved, or why
+ *   the reading was rejected.
+ * The whole marker turns green once the plate is saved (white while reading, amber rejected).
  */
 @Composable
 private fun PlateMarker(b: LiveBox, r: Rect, alpha: Float) {
     val density = LocalDensity.current
     val color = b.color()
-    val widthPx = r.width.roundToInt().coerceAtLeast(1)
-    val boxHeight = with(density) { r.height.toDp() }
+    val stripH = 18.dp
+    val stripPx = with(density) { stripH.toPx() }
     val shape = RoundedCornerShape(5.dp)
-    val ink = Color.Black.copy(alpha = 0.85f)
 
-    val label = buildAnnotatedString {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)) {
-            append(b.savedText ?: b.text ?: "· · ·")
-        }
-        if (!b.accepted) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color.Black.copy(alpha = 0.55f))) {
-                append(if (b.reason == "format") " ✕" else " ?")
-            }
-        }
-    }
-    // Start at 13sp and step down until it fits; re-fit only when the text or width really change.
-    var fontSize by remember(label.text, b.saved, widthPx / 24) { mutableStateOf(13.sp) }
-    val progress = when {
-        b.saved -> 1f
-        b.accepted && b.needed > 0 -> (b.matches.toFloat() / b.needed).coerceIn(0f, 1f)
-        else -> 0f
+    val top = b.text ?: "—"
+    val bottom = when {
+        b.saved -> b.savedText ?: b.text ?: ""
+        b.accepted -> "${b.matches}/${b.needed}"
+        b.reason == "format" -> "not a plate"
+        else -> "unsure"
     }
 
     Column(
         Modifier
-            .layout { measurable, _ ->
-                val p = measurable.measure(Constraints.fixedWidth(widthPx))
-                layout(0, 0) {
-                    // Bottom of the column = bottom of the plate box; the header sits above it.
-                    p.place(r.left.roundToInt(), r.bottom.roundToInt() - p.height)
-                }
-            }
+            .offset { IntOffset(r.left.roundToInt(), (r.top - stripPx).roundToInt()) }
+            .size(
+                with(density) { r.width.toDp() },
+                with(density) { (r.height + 2 * stripPx).toDp() },
+            )
             .alpha(alpha)
-            .border(3.dp, Color.Black.copy(alpha = 0.22f), shape) // soft contrast edge
             .border(1.5.dp, color, shape)
-            .clip(shape)
-            .background(color.copy(alpha = 0.08f)),
+            .clip(shape),
     ) {
-        Column(Modifier.fillMaxWidth().background(color)) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (b.saved) {
-                    Icon(
-                        Icons.Filled.Check,
-                        contentDescription = "Saved",
-                        tint = ink,
-                        modifier = Modifier.size(with(density) { fontSize.toDp() }),
-                    )
-                    Spacer(Modifier.width(2.dp))
-                }
-                Text(
-                    label,
-                    color = ink,
-                    fontSize = fontSize,
-                    lineHeight = fontSize * 1.1f,
-                    maxLines = 1,
-                    softWrap = false,
-                    textAlign = TextAlign.Center,
-                    onTextLayout = { result ->
-                        if (result.didOverflowWidth && fontSize.value > 6f) {
-                            fontSize = (fontSize.value - 1f).sp
-                        }
-                    },
-                )
-            }
-            // Progress towards saving (matching readings / needed).
-            Box(Modifier.fillMaxWidth().height(2.dp).background(Color.Black.copy(alpha = 0.12f))) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(progress)
-                        .height(2.dp)
-                        .background(Color.Black.copy(alpha = 0.55f))
-                )
-            }
-        }
-        Spacer(Modifier.height(boxHeight))
+        Strip(top, color, stripH)
+        Spacer(Modifier.weight(1f))
+        Strip(bottom, color, stripH)
     }
 }
 
-/** Small status after the plate number: "2/3", "saved", "?" (unsure), "✕" (not a plate format). */
-private fun tagStatus(b: LiveBox): String = when {
-    b.saved -> "saved"
-    b.accepted -> "${b.matches}/${b.needed}"
-    b.reason == "format" -> "✕"
-    else -> "?"
+/** A filled strip with one line of centred text that shrinks to fit the width. */
+@Composable
+private fun Strip(text: String, color: Color, height: androidx.compose.ui.unit.Dp) {
+    val density = LocalDensity.current
+    // Sized in dp (not sp) so it always fits the fixed strip height, whatever the font scale.
+    val maxSize = with(density) { 12.dp.toSp() }
+    var fontSize by remember(text) { mutableStateOf(maxSize) }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .background(color)
+            .padding(horizontal = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = Color.Black,
+            fontSize = fontSize,
+            lineHeight = fontSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+            textAlign = TextAlign.Center,
+            onTextLayout = { result ->
+                if (result.didOverflowWidth && fontSize.value > 5f) fontSize = (fontSize.value - 1f).sp
+            },
+        )
+    }
 }
 
 /** Small stats line shown under the recording timer when live readings are on. */

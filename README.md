@@ -45,7 +45,7 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Read plates from:** *Video* (live 1080p feed, several images a second; default) or *Photos* (a full-resolution photo every 0.5–3 s; sharper and reads further on many phones, but fewer images, so fast-passing cars may be missed). In photo mode a single clear read is enough to save a car that only appears in one photo.
 - **Matching readings to save:** 2–5 frames must read exactly the same text before a plate is saved (default 3).
 - **Save the same plate again after:** how long a plate must be out of view before it's saved again.
-- **Show live readings:** while recording, draws a thin box around every plate the detector finds with a small tab: white `LXC15M 2/3` while collecting matching readings, green `LXC15M ✓` once saved, amber `?` (unsure) or `✕` (not a plate format) when rejected. Also shows the image size being read and how long each one takes. Useful for checking why a plate is misread.
+- **Show live readings:** while recording, draws a box around every plate the detector finds, with a strip on top showing the plate number read in that frame and a strip underneath showing progress (`2/3`), the saved text once saved, or why it was rejected. White while reading, green once saved, amber when rejected. Also shows the image size being read and how long each one takes. Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 
 ### Watch list
