@@ -87,7 +87,6 @@ fun ScannerScreen(viewModel: PlateViewModel) {
     val plates by viewModel.plates.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val recordingSince by viewModel.recordingSince.collectAsStateWithLifecycle()
-    val liveInfo by viewModel.liveInfo.collectAsStateWithLifecycle()
     val captureMode by viewModel.captureMode.collectAsStateWithLifecycle()
     val photoIntervalMs by viewModel.photoIntervalMs.collectAsStateWithLifecycle()
     var openPanel by rememberSaveable { mutableStateOf(OpenPanel.None) }
@@ -166,7 +165,9 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             recording = recording,
             modifier = Modifier.fillMaxSize(),
         )
-        liveInfo?.let { LiveBoxes(it, Modifier.fillMaxSize()) }
+        // Live readings change every frame: collected in their own small scopes so a frame
+        // redraws only the boxes / stats line, and skipped while a page covers the camera.
+        if (openPanel == OpenPanel.None) LiveBoxesLayer(viewModel)
 
         Column(
             modifier = Modifier
@@ -176,7 +177,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (recording) RecordingIndicator(recordingSince)
-            liveInfo?.let { LiveStats(it) }
+            if (openPanel == OpenPanel.None) LiveStatsLine(viewModel)
             AnimatedVisibility(
                 visible = noticeVisible,
                 enter = fadeIn() + slideInVertically { -it / 2 },
@@ -188,7 +189,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
 
         BottomControls(
             recording = recording,
-            pulse = pulse.value,
+            pulse = { pulse.value },
             plateCount = plates.size,
             onSettings = { openPanel = OpenPanel.Settings },
             onMenu = { openPanel = OpenPanel.Plates },
@@ -238,6 +239,18 @@ fun ScannerScreen(viewModel: PlateViewModel) {
 }
 
 @Composable
+private fun LiveBoxesLayer(viewModel: PlateViewModel) {
+    val info by viewModel.liveInfo.collectAsStateWithLifecycle()
+    info?.let { LiveBoxes(it, Modifier.fillMaxSize()) }
+}
+
+@Composable
+private fun LiveStatsLine(viewModel: PlateViewModel) {
+    val info by viewModel.liveInfo.collectAsStateWithLifecycle()
+    info?.let { LiveStats(it) }
+}
+
+@Composable
 private fun WatchBanner(alert: Notice?, onDismiss: () -> Unit) {
     if (alert == null) return
     Row(
@@ -269,7 +282,8 @@ private fun WatchBanner(alert: Notice?, onDismiss: () -> Unit) {
 @Composable
 private fun BottomControls(
     recording: Boolean,
-    pulse: Float,
+    /** Read only here, so the menu-button pulse animation doesn't redraw the whole screen. */
+    pulse: () -> Float,
     plateCount: Int,
     onSettings: () -> Unit,
     onMenu: () -> Unit,
@@ -316,10 +330,11 @@ private fun BottomControls(
         Spacer(Modifier.weight(1f))
 
         Box {
+            val p = pulse()
             RoundButton(
                 onClick = onMenu,
-                ringColor = lerp(GlassBorder, Accent, pulse),
-                modifier = Modifier.scale(1f + 0.12f * pulse),
+                ringColor = lerp(GlassBorder, Accent, p),
+                modifier = Modifier.scale(1f + 0.12f * p),
             ) {
                 Icon(Icons.Filled.Menu, contentDescription = "Detected plates", tint = Color.White)
             }

@@ -7,11 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -29,10 +26,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -80,7 +75,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -213,6 +207,7 @@ fun PlatesPage(
             } else {
                 PlateDetail(
                     plateId = id,
+                    allPlates = plates,
                     recording = recording,
                     recordingSince = recordingSince,
                     viewModel = viewModel,
@@ -898,6 +893,7 @@ private fun EmptyState(title: String, body: String) {
 @Composable
 private fun PlateDetail(
     plateId: Long,
+    allPlates: List<PlateEntity>,
     recording: Boolean,
     recordingSince: Long,
     viewModel: PlateViewModel,
@@ -913,10 +909,11 @@ private fun PlateDetail(
     var loaded by remember(plateId) { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var viewingIndex by remember { mutableStateOf<Int?>(null) }
-    val allPlates by viewModel.plates.collectAsStateWithLifecycle()
-    val similar = plate?.let { p ->
-        allPlates.filter { it.id != p.id && PlateTracker.similar(it.plateNumber, p.plateNumber, loose = true) }
-    } ?: emptyList()
+    val number = plate?.plateNumber
+    val similar = remember(number, allPlates) {
+        if (number == null) emptyList()
+        else allPlates.filter { it.plateNumber != number && PlateTracker.similar(it.plateNumber, number, loose = true) }
+    }
 
     // If the plate disappears (deleted), go back to the list.
     LaunchedEffect(plate) {
@@ -1032,37 +1029,27 @@ private fun PlateDetail(
 
             val last = sightings.firstOrNull { it.latitude != null }
             item(key = "location") {
-                if (last == null) {
-                    Column(Modifier.padding(bottom = 12.dp)) {
-                        Text(
-                            "LAST LOCATION",
-                            color = Muted,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                        )
+                // Place only; coordinates are in the individual sighting view.
+                val place = last?.let { placeText(it) }
+                Column(Modifier.padding(bottom = 12.dp)) {
+                    Text(
+                        "LAST LOCATION",
+                        color = Muted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                    if (last == null) {
                         Text(
                             "Not recorded yet. New sightings save it while recording with location on.",
                             color = Muted,
                             fontSize = 12.sp,
                         )
-                    }
-                } else {
-                    Column(Modifier.padding(bottom = 12.dp)) {
+                    } else {
                         Text(
-                            "LAST LOCATION",
-                            color = Muted,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                        )
-                        // Selectable so the coordinates can be copied.
-                        // Place only; coordinates are in the individual sighting view.
-                        Text(
-                            placeText(last) ?: "Address not available",
-                            color = if (placeText(last) != null) Color.White else Muted,
+                            place ?: "Address not available",
+                            color = if (place != null) Color.White else Muted,
                             fontSize = 14.sp,
                             lineHeight = 18.sp,
                         )

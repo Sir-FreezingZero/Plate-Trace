@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,8 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,14 +43,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalFocusManager
@@ -97,10 +91,9 @@ private val CardPad = 8.dp
 
 private val RowPadding = Modifier.padding(horizontal = CardPad)
 
-/** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
+/** Height of every control in a card; all are fully rounded (radius = half the height). */
 private val PillHeight = 22.dp
-/** Every control's corner radius; the card corner is this + [CardPad], so they're concentric. */
-private val ControlRadius = 11.dp // half of PillHeight: every control has fully round ends
+private val ControlRadius = PillHeight / 2
 private val PillShape = RoundedCornerShape(50)
 private val PillBg = Color.White.copy(alpha = 0.08f)
 
@@ -135,13 +128,12 @@ private fun PillSlider(
     enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    // Track colours only; the thumb is drawn below. Disabled rows are dimmed by the row itself.
     val colors = SliderDefaults.colors(
-        thumbColor = Color.White,
         activeTrackColor = Accent,
         inactiveTrackColor = PillBg,
         activeTickColor = Color.Transparent,
         inactiveTickColor = Color.Transparent,
-        disabledThumbColor = Color.White,
         disabledActiveTrackColor = Accent,
         disabledInactiveTrackColor = PillBg,
         disabledActiveTickColor = Color.Transparent,
@@ -465,7 +457,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** Stacks its children and draws a fine line between each pair (inset from the sides). */
+/** Stacks its children and draws a full-width fine line between each pair. */
 @Composable
 private fun DividedColumn(content: @Composable () -> Unit) {
     val lineYs = remember { ArrayList<Int>() }
@@ -532,12 +524,10 @@ private fun RowText(
     description: String?,
     monospaceTitle: Boolean = false,
     modifier: Modifier = Modifier,
-    titleColor: Color = Color.Unspecified,
 ) {
     Column(modifier) {
         Text(
             title,
-            color = titleColor,
             fontSize = 14.sp,
             fontWeight = if (monospaceTitle) FontWeight.Bold else FontWeight.Medium,
             fontFamily = if (monospaceTitle) FontFamily.Monospace else FontFamily.Default,
@@ -566,8 +556,7 @@ private fun ToggleRow(
             .then(RowPadding)
             .padding(vertical = CardPad)
             .alpha(if (enabled) 1f else 0.38f),
-        // Top-aligned: in a card's first row the switch sits CardPad from the top and right
-        // edges, concentric with the card's top-right corner.
+        // Top-aligned so the switch lines up with the title, not a long description.
         verticalAlignment = Alignment.Top,
     ) {
         RowText(title, description, monospaceTitle, Modifier.weight(1f))
@@ -825,7 +814,7 @@ private fun ChoiceRow(
     Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = CardPad)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = LocalTextStyle.current.merge(TitleStyle), modifier = Modifier.weight(1f))
-            // Pill track with a pill-shaped selected option inset 2dp (concentric).
+            // Pill track with a pill-shaped selected option inset 2dp.
             Row(
                 Modifier
                     .height(PillHeight)

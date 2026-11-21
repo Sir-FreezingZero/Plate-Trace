@@ -34,9 +34,6 @@ abstract class PlateDao {
     @Query("UPDATE sightings SET road = :road, city = :city, state = :state WHERE id = :id")
     abstract suspend fun setPlace(id: Long, road: String?, city: String?, state: String?)
 
-    @Query("SELECT * FROM plates WHERE lastSeen >= :since")
-    abstract suspend fun platesSeenSince(since: Long): List<PlateEntity>
-
     @Query("SELECT * FROM plates WHERE id = :id")
     abstract suspend fun plateById(id: Long): PlateEntity?
 
@@ -75,7 +72,6 @@ abstract class PlateDao {
 
     @Query("UPDATE plates SET watched = :watched WHERE id = :id")
     abstract suspend fun setWatched(id: Long, watched: Boolean)
-
 
     @Query("SELECT * FROM plates ORDER BY lastSeen DESC")
     abstract fun observePlates(): Flow<List<PlateEntity>>

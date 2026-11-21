@@ -24,7 +24,6 @@ data class LiveBox(
     val box: Rect,
     /** What was read, or null if nothing readable. */
     val text: String?,
-    val confidence: Float,
     /** True if the reading passed the confidence and plate-format checks. */
     val accepted: Boolean,
     /** Why it was rejected, when not accepted. */
@@ -214,13 +213,13 @@ class PlateAnalyzer(
             val reading = models.read(crop)
             val text = reading.text.ifEmpty { null }
             if (reading.text.length < 2 || reading.minConfidence < minCharConfidence) {
-                live?.add(LiveBox(detection.box, text, reading.minConfidence, accepted = false, reason = "unsure"))
+                live?.add(LiveBox(detection.box, text, accepted = false, reason = "unsure"))
                 return@mapNotNull null
             }
             val plate = PlateTextFilter.accept(PlateTextFilter.normalize(reading.text))
             live?.add(
                 LiveBox(
-                    detection.box, plate ?: text, reading.minConfidence, accepted = plate != null,
+                    detection.box, plate ?: text, accepted = plate != null,
                     reason = if (plate == null) "format" else null,
                 )
             )
@@ -239,6 +238,5 @@ class PlateAnalyzer(
 
     private companion object {
         const val TAG = "PlateAnalyzer"
-
     }
 }
