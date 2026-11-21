@@ -528,7 +528,7 @@ private fun PlateTimeline(
             entries.isEmpty() && !showWaiting ->
                 EmptyState("No matches", "No saved plate contains \"$needle\".")
             else -> LazyColumn(
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 6.dp, end = 12.dp, top = 0.dp, bottom = 24.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (showWaiting) {
@@ -549,7 +549,7 @@ private fun PlateTimeline(
                     val above = i > 0
                     val below = i < entries.lastIndex
                     when (e) {
-                        is Entry.Day -> DayRow(e)
+                        is Entry.Day -> DayRow(e, above, below)
                         is Entry.Item -> {
                             val id = e.plate.id
                             val row: @Composable () -> Unit = {
@@ -573,14 +573,22 @@ private fun PlateTimeline(
                             }
                             val first = i == 0 || entries[i - 1] is Entry.Day
                             val last = i == entries.lastIndex || entries[i + 1] is Entry.Day
-                            // No swipe-to-delete while selecting.
-                            if (selecting) {
-                                Box(Modifier.panelRow(first, last)) { row() }
-                            } else {
-                                SwipeToDelete(
-                                    onDelete = { onSwipeDelete(e.plate) },
-                                    modifier = Modifier.panelRow(first, last),
-                                ) { row() }
+                            val dot = when {
+                                e.plate.watched -> Dot.Watched
+                                id == newestId -> Dot.Highlight
+                                else -> Dot.Small
+                            }
+                            // Timeline on the left, the plate's panel row beside it. Only the
+                            // panel moves when swiped. No swipe-to-delete while selecting.
+                            Box(Modifier.fillMaxWidth().timeline(dot, above, below)) {
+                                if (selecting) {
+                                    Box(Modifier.panelRow(first, last)) { row() }
+                                } else {
+                                    SwipeToDelete(
+                                        onDelete = { onSwipeDelete(e.plate) },
+                                        modifier = Modifier.panelRow(first, last),
+                                    ) { row() }
+                                }
                             }
                         }
                     }
@@ -591,6 +599,35 @@ private fun PlateTimeline(
 }
 
 private enum class Dot { Small, Highlight, Watched, Ring, RingAccent }
+
+private val GutterWidth = 28.dp
+
+/**
+ * Draws the timeline in a [GutterWidth]-wide strip on the left of this item (line through the
+ * full height, dot centred) and pads the content past it.
+ */
+private fun Modifier.timeline(dot: Dot, lineAbove: Boolean, lineBelow: Boolean): Modifier = this
+    .drawBehind {
+        val cx = GutterWidth.toPx() / 2
+        val cy = size.height / 2
+        val stroke = 1.dp.toPx()
+        if (lineAbove) drawLine(LineColor, Offset(cx, 0f), Offset(cx, cy), stroke)
+        if (lineBelow) drawLine(LineColor, Offset(cx, cy), Offset(cx, size.height), stroke)
+        val c = Offset(cx, cy)
+        when (dot) {
+            Dot.Small -> drawCircle(DotColor, 4.dp.toPx(), c)
+            Dot.Highlight -> drawCircle(Accent, 5.dp.toPx(), c)
+            Dot.Watched -> drawCircle(WatchAmber, 5.dp.toPx(), c)
+            Dot.Ring, Dot.RingAccent -> {
+                drawCircle(PageColor, 6.dp.toPx(), c)
+                drawCircle(
+                    if (dot == Dot.RingAccent) Accent else DotColor,
+                    5.dp.toPx(), c, style = Stroke(2.dp.toPx()),
+                )
+            }
+        }
+    }
+    .padding(start = GutterWidth)
 
 /** Vertical timeline line with a dot centred on the row. */
 @Composable
@@ -618,8 +655,14 @@ private fun TimelineGutter(dot: Dot, lineAbove: Boolean, lineBelow: Boolean) {
 }
 
 @Composable
-private fun DayRow(day: Entry.Day) {
-    GroupLabel(day.label)
+private fun DayRow(day: Entry.Day, lineAbove: Boolean, lineBelow: Boolean) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .timeline(if (day.isToday) Dot.RingAccent else Dot.Ring, lineAbove, lineBelow)
+    ) {
+        GroupLabel(day.label, Modifier.padding(bottom = 0.dp))
+    }
 }
 
 /** Small uppercase label above a panel ("TODAY", "WAITING FOR", "HISTORY"). */
