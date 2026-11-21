@@ -54,6 +54,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
 import kotlin.math.roundToInt
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.RadioButton
@@ -908,7 +912,7 @@ private fun PlateDetail(
     val sightings by sightingsFlow.collectAsState(initial = emptyList())
     var loaded by remember(plateId) { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    var viewing by remember { mutableStateOf<SightingEntity?>(null) }
+    var viewingIndex by remember { mutableStateOf<Int?>(null) }
     val allPlates by viewModel.plates.collectAsStateWithLifecycle()
     val similar = plate?.let { p ->
         allPlates.filter { it.id != p.id && PlateTracker.similar(it.plateNumber, p.plateNumber, loose = true) }
@@ -952,7 +956,7 @@ private fun PlateDetail(
                         .aspectRatio(16f / 10f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(ThumbBackground)
-                        .clickable(enabled = latest != null) { viewing = latest },
+                        .clickable(enabled = latest != null) { viewingIndex = 0 },
                 ) {
                     AsyncImage(
                         model = File(p.latestVehicleImagePath ?: p.latestImagePath),
@@ -1087,7 +1091,7 @@ private fun PlateDetail(
                     lineAbove = i > 0,
                     lineBelow = i < sightings.lastIndex,
                     highlight = i == 0,
-                    onClick = { viewing = s },
+                    onClick = { viewingIndex = i },
                 )
             }
         }
@@ -1110,7 +1114,16 @@ private fun PlateDetail(
         )
     }
 
-    viewing?.let { s -> SightingViewer(s, plate?.plateNumber.orEmpty(), onDismiss = { viewing = null }) }
+    viewingIndex?.let { start ->
+        if (sightings.isNotEmpty()) {
+            SightingViewer(
+                sightings = sightings,
+                startIndex = start.coerceIn(0, sightings.lastIndex),
+                plateNumber = plate?.plateNumber.orEmpty(),
+                onDismiss = { viewingIndex = null },
+            )
+        }
+    }
 }
 
 @Composable
@@ -1142,12 +1155,31 @@ private fun SightingRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TimelineGutter(if (highlight) Dot.Highlight else Dot.Small, lineAbove, lineBelow)
-        Column(Modifier.weight(1f).padding(start = 6.dp, end = 6.dp)) {
-            Text(shortDateTime(s.timestamp), fontSize = 13.sp, maxLines = 1)
-            Text(relative(s.timestamp), color = Muted, fontSize = 11.sp, maxLines = 1)
-            placeText(s)?.let { Text(it, color = Muted, fontSize = 11.sp, maxLines = 1) }
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            Text(
+                "${compactDateTime(s.timestamp)} · ${relative(s.timestamp)}",
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            compactPlace(s)?.let {
+                Text(it, color = Muted, fontSize = 12.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             coordsText(s)?.let {
-                Text(it, color = Muted.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, maxLines = 1)
+                Text(
+                    it,
+                    color = Muted.copy(alpha = 0.7f),
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                )
             }
         }
         if (s.vehicleImagePath != null) {
@@ -1156,9 +1188,9 @@ private fun SightingRow(
                 contentDescription = "Vehicle",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .padding(vertical = 5.dp)
-                    .width(66.dp)
-                    .height(48.dp)
+                    .padding(vertical = 6.dp)
+                    .width(64.dp)
+                    .height(46.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(ThumbBackground),
             )
@@ -1169,9 +1201,9 @@ private fun SightingRow(
             contentDescription = "Plate",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .padding(vertical = 5.dp)
-                .width(66.dp)
-                .height(48.dp)
+                .padding(vertical = 6.dp)
+                .width(64.dp)
+                .height(46.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(ThumbBackground),
         )
@@ -1197,41 +1229,137 @@ private fun PlateBadge(number: String, fontSize: TextUnit) {
     )
 }
 
-/** Full-screen view of one sighting: vehicle on top, plate below. Tap to close. */
+/**
+ * Full-screen view of a plate's sightings: car shot, plate crop and a details card (plate, read
+ * text, date, time, place, coordinates). Swipe left/right between sightings.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SightingViewer(sighting: SightingEntity, plateNumber: String, onDismiss: () -> Unit) {
+private fun SightingViewer(
+    sightings: List<SightingEntity>,
+    startIndex: Int,
+    plateNumber: String,
+    onDismiss: () -> Unit,
+) {
+    val pager = rememberPagerState(initialPage = startIndex, pageCount = { sightings.size })
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .clickable(onClick = onDismiss)
-                .navigationBarsPadding()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (sighting.vehicleImagePath != null) {
-                AsyncImage(
-                    model = File(sighting.vehicleImagePath),
-                    contentDescription = "Vehicle",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)),
-                )
+        Surface(Modifier.fillMaxSize(), color = PageColor, contentColor = Color.White) {
+            Column(Modifier.fillMaxSize()) {
+                // Top bar: close · plate · position
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                    }
+                    PlateBadge(plateNumber, fontSize = 18.sp)
+                    Spacer(Modifier.weight(1f))
+                    if (sightings.size > 1) {
+                        Text(
+                            "${pager.currentPage + 1} / ${sightings.size}",
+                            color = Muted,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.padding(top = 8.dp), color = LineColor)
+
+                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                    SightingPage(sightings[page], plateNumber)
+                }
             }
-            AsyncImage(
-                model = File(sighting.imagePath),
-                contentDescription = "Plate",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth(0.8f).clip(RoundedCornerShape(6.dp)),
-            )
-            PlateBadge(plateNumber, fontSize = 20.sp)
-            Text(shortDateTime(sighting.timestamp), color = Muted, fontSize = 14.sp)
         }
     }
+}
+
+@Composable
+private fun SightingPage(s: SightingEntity, plateNumber: String) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (s.vehicleImagePath != null) {
+            AsyncImage(
+                model = File(s.vehicleImagePath),
+                contentDescription = "Car",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ThumbBackground),
+            )
+        }
+        AsyncImage(
+            model = File(s.imagePath),
+            contentDescription = "Plate",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(ThumbBackground),
+        )
+
+        // Details card
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(FieldColor)
+                .border(1.dp, LineColor, RoundedCornerShape(10.dp)),
+        ) {
+            DetailRow("Plate", plateNumber, monospace = true)
+            if (s.rawText.isNotBlank() && s.rawText != plateNumber) {
+                DetailDivider()
+                DetailRow("Read as", s.rawText, monospace = true)
+            }
+            DetailDivider()
+            DetailRow("Date", fullDate(s.timestamp))
+            DetailDivider()
+            DetailRow("Time", "${fullTime(s.timestamp)} · ${relative(s.timestamp)}")
+            DetailDivider()
+            val place = placeText(s)
+            DetailRow(
+                "Location",
+                place ?: if (s.latitude != null) "Address not looked up" else "Not recorded",
+                muted = place == null,
+            )
+            coordsText(s)?.let {
+                DetailDivider()
+                SelectionContainer { DetailRow("Coordinates", it, monospace = true) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String, monospace: Boolean = false, muted: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(label, color = Muted, fontSize = 12.sp, lineHeight = 18.sp, modifier = Modifier.width(92.dp))
+        Text(
+            value,
+            color = if (muted) Muted else Color.White,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
+            fontWeight = if (monospace) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
+private fun DetailDivider() {
+    HorizontalDivider(Modifier.padding(horizontal = 14.dp), color = LineColor)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1275,4 +1403,48 @@ private fun coordsText(s: SightingEntity): String? {
     val lng = s.longitude ?: return null
     val acc = s.accuracyM?.let { " ±${it.roundToInt()} m" } ?: ""
     return "%.5f, %.5f".format(Locale.US, lat, lng) + acc
+}
+
+/** "Nov 21 · 1:56 PM" */
+private fun compactDateTime(time: Long): String =
+    SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(time)) + " · " +
+        java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(Date(time))
+
+/** "Saturday, November 21, 2026" */
+private fun fullDate(time: Long): String =
+    java.text.DateFormat.getDateInstance(java.text.DateFormat.FULL).format(Date(time))
+
+/** "1:56:23 PM" */
+private fun fullTime(time: Long): String =
+    java.text.DateFormat.getTimeInstance(java.text.DateFormat.MEDIUM).format(Date(time))
+
+private val RoadAbbreviations = listOf(
+    "Boulevard" to "Blvd", "Avenue" to "Ave", "Street" to "St", "Road" to "Rd", "Drive" to "Dr",
+    "Highway" to "Hwy", "Parkway" to "Pkwy", "Lane" to "Ln", "Court" to "Ct", "Place" to "Pl",
+    "Terrace" to "Ter", "Turnpike" to "Tpke", "Expressway" to "Expy", "Circle" to "Cir",
+    "North" to "N", "South" to "S", "East" to "E", "West" to "W",
+)
+
+private val StateCodes = mapOf(
+    "Alabama" to "AL", "Alaska" to "AK", "Arizona" to "AZ", "Arkansas" to "AR", "California" to "CA",
+    "Colorado" to "CO", "Connecticut" to "CT", "Delaware" to "DE", "Florida" to "FL", "Georgia" to "GA",
+    "Hawaii" to "HI", "Idaho" to "ID", "Illinois" to "IL", "Indiana" to "IN", "Iowa" to "IA",
+    "Kansas" to "KS", "Kentucky" to "KY", "Louisiana" to "LA", "Maine" to "ME", "Maryland" to "MD",
+    "Massachusetts" to "MA", "Michigan" to "MI", "Minnesota" to "MN", "Mississippi" to "MS",
+    "Missouri" to "MO", "Montana" to "MT", "Nebraska" to "NE", "Nevada" to "NV",
+    "New Hampshire" to "NH", "New Jersey" to "NJ", "New Mexico" to "NM", "New York" to "NY",
+    "North Carolina" to "NC", "North Dakota" to "ND", "Ohio" to "OH", "Oklahoma" to "OK",
+    "Oregon" to "OR", "Pennsylvania" to "PA", "Rhode Island" to "RI", "South Carolina" to "SC",
+    "South Dakota" to "SD", "Tennessee" to "TN", "Texas" to "TX", "Utah" to "UT", "Vermont" to "VT",
+    "Virginia" to "VA", "Washington" to "WA", "West Virginia" to "WV", "Wisconsin" to "WI",
+    "Wyoming" to "WY", "District of Columbia" to "DC",
+)
+
+/** Short place for list rows: "Arnold Blvd, Long Beach, NJ". */
+private fun compactPlace(s: SightingEntity): String? {
+    val road = s.road?.split(" ")?.joinToString(" ") { word ->
+        RoadAbbreviations.firstOrNull { it.first.equals(word, ignoreCase = true) }?.second ?: word
+    }
+    val state = s.state?.let { StateCodes[it] ?: it }
+    return listOfNotNull(road, s.city, state).filter { it.isNotBlank() }.joinToString(", ").ifEmpty { null }
 }
