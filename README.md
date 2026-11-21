@@ -16,7 +16,7 @@ The whole screen is the camera, with one row of controls along the bottom:
 
 | Control | What it does |
 |---|---|
-| ⚙ (bottom left) | Settings: how soon the same plate is saved again, delete all plates |
+| ⚙ (bottom left) | Opens the Settings page: how soon the same plate is saved again, saved-data summary, delete all plates. Recording keeps running while it's open |
 | Big round button (centre) | Start / stop recording. Plates are only captured while recording; a red timer shows at the top |
 | Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
 | Other bar buttons | Spare, not used yet |
@@ -29,7 +29,7 @@ When a plate is saved its number flashes at the top (green = new plate, dark = s
 |---|---|
 | Camera frames (1080p) → ML Kit text recognition | `scan/PlateAnalyzer.kt` |
 | Keep text that looks like a plate (4–8 letters/digits, has a digit, wide box) | `scan/PlateTextFilter.kt` |
-| Require the same reading in 2 frames; don't re-record while it stays in view; record a new sighting after 15 s out of view | `scan/PlateTracker.kt` |
+| Match reads fuzzily (OCR spells the same plate slightly differently frame to frame); require 2 matching reads; don't re-record while it stays in view; record a new sighting after it's been unseen for the Settings delay | `scan/PlateTracker.kt` |
 | Crop the plate (text box + margin) and a wider shot of the back of the car, save JPEGs + Room row | `data/PlateRepository.kt`, `data/PlateDao.kt` |
 
 Images are stored in the app's private storage (`files/plate_crops/`); the database is `plates.db`.

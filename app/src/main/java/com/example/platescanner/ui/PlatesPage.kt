@@ -86,10 +86,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private val PageColor = Color(0xFF0E0F11)
-private val LineColor = Color.White.copy(alpha = 0.14f)
 private val DotColor = Color(0xFF6B6F76)
-private val FieldColor = Color.White.copy(alpha = 0.06f)
 
 private enum class SortMode(val label: String) { Recent("Recent"), MostSeen("Most seen") }
 
@@ -113,36 +110,28 @@ fun PlatesPage(
 ) {
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInHorizontally { it } + fadeIn(),
-        exit = slideOutHorizontally { it } + fadeOut(),
-    ) {
-        Surface(Modifier.fillMaxSize(), color = PageColor, contentColor = Color.White) {
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                AnimatedContent(
-                    targetState = selectedId,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "platesPage",
-                ) { id ->
-                    if (id == null) {
-                        PlateTimeline(
-                            plates = plates,
-                            recording = recording,
-                            recordingSince = recordingSince,
-                            onSelect = { selectedId = it.id },
-                            onBack = onClose,
-                        )
-                    } else {
-                        PlateDetail(
-                            plateId = id,
-                            recording = recording,
-                            recordingSince = recordingSince,
-                            viewModel = viewModel,
-                            onBack = { selectedId = null },
-                        )
-                    }
-                }
+    FullPage(visible = visible) {
+        AnimatedContent(
+            targetState = selectedId,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "platesPage",
+        ) { id ->
+            if (id == null) {
+                PlateTimeline(
+                    plates = plates,
+                    recording = recording,
+                    recordingSince = recordingSince,
+                    onSelect = { selectedId = it.id },
+                    onBack = onClose,
+                )
+            } else {
+                PlateDetail(
+                    plateId = id,
+                    recording = recording,
+                    recordingSince = recordingSince,
+                    viewModel = viewModel,
+                    onBack = { selectedId = null },
+                )
             }
         }
     }
@@ -188,23 +177,13 @@ private fun PlateTimeline(
     val newestId = plates.firstOrNull()?.id
 
     Column(Modifier.fillMaxSize()) {
-        // Header
-        Row(
-            Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        PageHeader(
+            title = "Plates",
+            subtitle = "${plates.size} plates · ${plates.sumOf { it.sightingCount }} sightings",
+            recording = recording,
+            recordingSince = recordingSince,
+            onBack = onBack,
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Back to camera")
-            }
-            Column(Modifier.weight(1f)) {
-                Text("Plates", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "${plates.size} plates · ${plates.sumOf { it.sightingCount }} sightings",
-                    color = Muted,
-                    fontSize = 12.sp,
-                )
-            }
-            if (recording) RecordingIndicator(recordingSince)
             IconButton(onClick = {
                 searching = !searching
                 if (!searching) query = ""

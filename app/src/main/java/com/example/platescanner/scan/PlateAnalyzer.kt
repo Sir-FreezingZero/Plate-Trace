@@ -71,7 +71,10 @@ class PlateAnalyzer(
     private fun handle(candidates: List<PlateCandidate>, imageProxy: ImageProxy, rotation: Int) {
         if (candidates.isEmpty()) return
         val now = SystemClock.elapsedRealtime()
-        val confirmed = candidates.filter { tracker.onRead(it.plate, now) }
+        // The tracker may return an earlier spelling of the same plate to save under.
+        val confirmed = candidates.mapNotNull { c ->
+            tracker.onRead(c.plate, now)?.let { c.copy(plate = it) }
+        }.distinctBy { it.plate }
         if (confirmed.isEmpty()) return
 
         // ML Kit boxes are in upright coordinates, so rotate the frame to match before cropping.

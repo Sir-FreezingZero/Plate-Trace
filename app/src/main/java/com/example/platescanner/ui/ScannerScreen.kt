@@ -154,11 +154,13 @@ fun ScannerScreen(viewModel: PlateViewModel) {
                 .padding(horizontal = 12.dp, vertical = 20.dp),
         )
 
-        SettingsPanel(
+        SettingsPage(
             visible = openPanel == OpenPanel.Settings,
-            plateCount = plates.size,
+            plates = plates,
+            recording = recording,
+            recordingSince = recordingSince,
             viewModel = viewModel,
-            onDismiss = { openPanel = OpenPanel.None },
+            onClose = { openPanel = OpenPanel.None },
         )
         // Full-screen page drawn over the camera; the camera keeps running underneath so
         // recording continues while it's open.
