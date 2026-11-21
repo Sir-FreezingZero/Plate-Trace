@@ -109,6 +109,8 @@ fun SettingsPage(
             recordingSince = recordingSince,
             onBack = onClose,
         )
+        // Full-width line under the header.
+        HorizontalDivider(Modifier.fillMaxWidth().padding(top = 4.dp), color = LineColor)
 
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
 
