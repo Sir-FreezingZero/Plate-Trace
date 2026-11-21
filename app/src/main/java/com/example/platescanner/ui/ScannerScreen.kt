@@ -78,6 +78,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
     val plates by viewModel.plates.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val recordingSince by viewModel.recordingSince.collectAsStateWithLifecycle()
+    val liveInfo by viewModel.liveInfo.collectAsStateWithLifecycle()
     var openPanel by rememberSaveable { mutableStateOf(OpenPanel.None) }
 
     var notice by remember { mutableStateOf<Notice?>(null) }
@@ -142,6 +143,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (recording) RecordingIndicator(recordingSince)
+            liveInfo?.let { LiveReadout(it) }
             AnimatedVisibility(
                 visible = noticeVisible,
                 enter = fadeIn() + slideInVertically { -it / 2 },
@@ -196,6 +198,34 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             WatchBanner(watchAlert, onDismiss = { watchVisible = false })
+        }
+    }
+}
+
+/** Settings → Show live readings: what the reader saw in the latest frame. */
+@Composable
+private fun LiveReadout(info: com.example.platescanner.scan.FrameInfo) {
+    Column(
+        Modifier
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black.copy(alpha = 0.65f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Text(
+            "${info.width}×${info.height} · ${info.millis} ms",
+            color = Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
+        )
+        if (info.reads.isEmpty()) {
+            Text("no plate", color = Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        }
+        info.reads.forEach { (text, conf, width) ->
+            Text(
+                "%-9s %3d%%  %dpx".format(text, (conf * 100).toInt(), width),
+                color = if (conf >= 0.8f) Color.White else WatchAmber,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+            )
         }
     }
 }

@@ -2,7 +2,6 @@ package com.example.platescanner.scan
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Rect
 import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageAnalysis
@@ -16,8 +15,14 @@ class PlateDetection(
     val vehicle: Bitmap,
 )
 
-/** One plate found and read in a single frame. */
-private class PlateRead(val plate: String, val rawText: String, val box: Rect, val crop: Bitmap)
+/** What the reader saw in the latest frame, for the optional on-screen readout. */
+class FrameInfo(
+    val width: Int,
+    val height: Int,
+    val millis: Long,
+    /** text, lowest character confidence, plate width in px */
+    val reads: List<Triple<String, Float, Int>>,
+)
 
 /**
  * CameraX analyzer. For each frame (while recording):
@@ -26,8 +31,8 @@ private class PlateRead(val plate: String, val rawText: String, val box: Rect, v
  * 2. **Crop** each plate (with a small margin).
  * 3. **Read** the crop with the plate reader.
  * 4. **Check** the text against the plate-format rules from Settings.
- * 5. **Confirm** with [PlateTracker] (repeat reads, out-of-view delay), then hand the plate
- *    crop and a car shot centred on the plate to [onPlate].
+ * 5. **Vote** across every read while the plate is in view ([PlateTracker]), then hand the
+ *    agreed text, the clearest plate crop and a car shot centred on the plate to [onPlate].
  *
  * Runs synchronously on the analysis thread; with STRATEGY_KEEP_ONLY_LATEST, frames that
  * arrive while one is being processed are simply dropped.
@@ -62,6 +67,17 @@ class PlateAnalyzer(
         get() = tracker.cooldownMs
         set(value) { tracker.cooldownMs = value }
 
+    /** Optional: receives what was read in each frame (Settings → Show live readings). */
+    @Volatile var onFrameInfo: ((FrameInfo) -> Unit)? = null
+
+    /** Saves any plates still being voted on (call when recording stops). */
+    fun flush() {
+        tracker.flush(SystemClock.elapsedRealtime()).forEach { emit(it) }
+    }
+
+    private fun emit(r: PlateTracker.Result) =
+        onPlate(PlateDetection(r.plate, r.rawText, r.crop, r.vehicle))
+
     override fun analyze(imageProxy: ImageProxy) {
         if (!enabled) {
             imageProxy.close()
@@ -78,15 +94,17 @@ class PlateAnalyzer(
         if (frame == null) return
 
         try {
+            val start = SystemClock.elapsedRealtime()
             val reads = findAndRead(frame)
-            if (reads.isEmpty()) return
             val now = SystemClock.elapsedRealtime()
-            // The tracker may return an earlier spelling of the same plate to save under.
-            reads.mapNotNull { r -> tracker.onRead(r.plate, now)?.let { r to it } }
-                .distinctBy { it.second }
-                .forEach { (r, plate) ->
-                    onPlate(PlateDetection(plate, r.rawText, r.crop, frame.cropVehicle(r.box, vehicleScale)))
-                }
+            onFrameInfo?.invoke(
+                FrameInfo(frame.width, frame.height, now - start, reads.map {
+                    Triple(it.text, it.confidences.minOrNull() ?: 0f, it.box.width())
+                })
+            )
+            // Every frame goes to the tracker, even with no reads, so it notices plates leaving.
+            val scale = vehicleScale
+            tracker.onFrame(now, reads) { box -> frame.cropVehicle(box, scale) }.forEach { emit(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "Plate processing failed", t)
         }
@@ -99,15 +117,15 @@ class PlateAnalyzer(
      */
     fun scanStill(bitmap: Bitmap): List<PlateDetection> = try {
         findAndRead(bitmap)
-            .distinctBy { it.plate }
-            .map { PlateDetection(it.plate, it.rawText, it.crop, bitmap.cropVehicle(it.box, vehicleScale)) }
+            .distinctBy { it.text }
+            .map { PlateDetection(it.text, it.rawText, it.crop, bitmap.cropVehicle(it.box, vehicleScale)) }
     } catch (t: Throwable) {
         Log.e(TAG, "Still scan failed", t)
         emptyList()
     }
 
     /** Steps 1–4: detect, crop, read, check format. */
-    private fun findAndRead(frame: Bitmap): List<PlateRead> {
+    private fun findAndRead(frame: Bitmap): List<PlateTracker.Read> {
         val models = engine ?: return emptyList()
         return models.detect(frame).mapNotNull { detection ->
             val crop = frame.cropAround(detection.box)
@@ -117,7 +135,11 @@ class PlateAnalyzer(
             }
             val plate = PlateTextFilter.accept(PlateTextFilter.normalize(reading.text))
                 ?: return@mapNotNull null
-            PlateRead(plate, reading.text, detection.box, crop)
+            // accept() may correct look-alike characters but never changes the length, so the
+            // confidences still line up with the characters.
+            val confidences = if (plate.length == reading.confidences.size) reading.confidences
+            else FloatArray(plate.length) { reading.minConfidence }
+            PlateTracker.Read(plate, reading.text, confidences, detection.box, crop)
         }
     }
 

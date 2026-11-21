@@ -37,8 +37,13 @@ class PlateEngine(context: Context) : Closeable {
     /** A plate found in a frame, in frame pixel coordinates. */
     class Detection(val box: Rect, val score: Float)
 
-    /** Characters read from a plate crop and the lowest per-character confidence (0–1). */
-    class Reading(val text: String, val minConfidence: Float)
+    /**
+     * Characters read from a plate crop, with each character's confidence (0–1, aligned with
+     * [text]) and the lowest of them.
+     */
+    class Reading(val text: String, val confidences: FloatArray) {
+        val minConfidence: Float get() = confidences.minOrNull() ?: 0f
+    }
 
     private val env = OrtEnvironment.getEnvironment()
     private val detector: OrtSession
@@ -134,18 +139,17 @@ class PlateEngine(context: Context) : Closeable {
                 }
             }
 
-        // Each slot is a probability distribution over ALPHABET; '_' is padding.
+        // Each slot is a probability distribution over ALPHABET; '_' is padding (skipped).
         val chars = StringBuilder()
         val confidences = ArrayList<Float>(slots.size)
         for (slot in slots) {
             var best = 0
             for (k in 1 until slot.size) if (slot[k] > slot[best]) best = k
+            if (ALPHABET[best] == PAD) continue
             chars.append(ALPHABET[best])
             confidences.add(slot[best])
         }
-        val text = chars.toString().trimEnd(PAD)
-        val minConf = if (text.isEmpty()) 0f else confidences.subList(0, text.length).min()
-        return Reading(text.replace(PAD.toString(), ""), minConf)
+        return Reading(chars.toString(), confidences.toFloatArray())
     }
 
     override fun close() {

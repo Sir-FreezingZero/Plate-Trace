@@ -33,8 +33,8 @@ Each camera frame (while recording) goes through:
 | 2. Crop | Each plate is cropped with a small margin (this is the saved plate image) | `scan/BitmapUtils.kt` |
 | 3. Read | A plate **reader** (fast-plate-ocr `cct-s-v2-global`) reads the characters from the crop only | `scan/PlateEngine.kt` |
 | 4. Check | The text must fit the **Plate format** setting | `scan/PlateTextFilter.kt` |
-| 5. Confirm | Fuzzy matching across frames; saved once while in view, again after the out-of-view delay | `scan/PlateTracker.kt` |
-| 6. Save | Plate crop + car shot centred on the plate (black fill if it runs off the frame) | `data/PlateRepository.kt` |
+| 5. Vote | Every read of the plate while it's in view is collected; once it leaves view (or after 3 s) the text is chosen by a per-character vote weighted towards larger, sharper views. Saved once while in view, again after the out-of-view delay | `scan/PlateTracker.kt` |
+| 6. Save | The clearest plate crop + a car shot centred on the plate (black fill if it runs off the frame) | `data/PlateRepository.kt` |
 
 Both models run on the phone with ONNX Runtime, work offline, and are bundled in `app/src/main/assets`. They come from [fast-alpr](https://github.com/ankandrew/fast-alpr) by ankandrew (MIT licence; copies in `assets/licenses`). The Android pre/post-processing was checked against the reference Python implementation and gives identical results on test images.
 
@@ -43,18 +43,20 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 ### Settings
 - **Plate format:** *US plates* (default: needs letters and numbers, so phone numbers are ignored), *Only specific formats* (tick formats such as ABC 1234 or 1ABC234, or add your own with L = letter, 0 = number, * = either; look-alike characters like 0/O and 8/B are corrected to fit), or *Any plate-like text*.
 - **Save the same plate again after:** how long a plate must be out of view before it's saved again.
+- **Show live readings:** while recording, shows what the reader sees in each frame (text, confidence, plate size in pixels). Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 
 ### Watch list
 Tap the bell on any plate (in the list or on its detail page) to watch it. When a watched plate is seen again the phone vibrates, an amber banner appears over everything, and a notification with the car photo is posted (Android 13+ asks for notification permission the first time). Use the **Watched** filter on the Plates page to see only watched plates.
 
 ### Tuning in code
-- **Strictness / repeat timing:** `confirmFrames` and `confirmWindowMs` in `PlateTracker.kt`.
+- **Voting timing:** `minReads`, `settleMs`, `maxWaitMs` in `PlateTracker.kt`.
 - **Plate crop margin:** `PLATE_PAD_X` / `PLATE_PAD_Y` in `scan/PlateEngine.kt`.
 - **Detector / reader thresholds:** `DETECT_THRESHOLD` in `PlateEngine.kt`, `MIN_CHAR_CONFIDENCE` in `PlateAnalyzer.kt`.
 
 ## Limitations
 - Plates need to be roughly 75+ px wide in the 1080p camera frame to be found (about 2–3 car lengths away on most phones). Far-away plates are missed.
 - Each frame takes a few hundred milliseconds on a mid-range phone, so very fast-moving plates may be missed.
+- A plate is saved about 1 second after it leaves view (or after 3 seconds if it stays in view), because the app waits to collect several reads before deciding the text.
 - The car shot is framed from the plate's position and size (there is no car detector), so its framing is approximate.
 - Check local laws before recording plates of other people's vehicles.

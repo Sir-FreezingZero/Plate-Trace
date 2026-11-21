@@ -29,6 +29,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,6 +92,7 @@ fun SettingsPage(
     val cooldown by viewModel.cooldownSeconds.collectAsStateWithLifecycle()
     val rules by viewModel.formatRules.collectAsStateWithLifecycle()
     val scale by viewModel.vehicleScale.collectAsStateWithLifecycle()
+    val showLive by viewModel.showLive.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
 
@@ -160,6 +163,34 @@ fun SettingsPage(
                 FramingControl(
                     scale = scale,
                     onScaleChange = viewModel::setVehicleScale,
+                )
+            }
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.setShowLive(!showLive) }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Show live readings", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "While recording, show what the reader sees in each frame: the text, " +
+                            "how sure it is, and the plate's size in pixels.",
+                        color = Muted,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = showLive,
+                    onCheckedChange = viewModel::setShowLive,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.Black,
+                        checkedTrackColor = Accent,
+                    ),
                 )
             }
 

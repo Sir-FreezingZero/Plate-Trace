@@ -13,6 +13,7 @@ import com.example.platescanner.data.SightingEntity
 import com.example.platescanner.scan.PhotoLoader
 import com.example.platescanner.scan.PlateAnalyzer
 import com.example.platescanner.scan.FormatMode
+import com.example.platescanner.scan.FrameInfo
 import com.example.platescanner.scan.PlateDetection
 import com.example.platescanner.scan.PlateRules
 import com.example.platescanner.scan.PlateTextFilter
@@ -70,6 +71,13 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _vehicleScale = MutableStateFlow(loadVehicleScale())
     val vehicleScale: StateFlow<Float> = _vehicleScale.asStateFlow()
 
+    private val _showLive = MutableStateFlow(prefs.getBoolean(KEY_SHOW_LIVE, false))
+    val showLive: StateFlow<Boolean> = _showLive.asStateFlow()
+
+    /** Latest frame's reads, when "Show live readings" is on. */
+    private val _liveInfo = MutableStateFlow<FrameInfo?>(null)
+    val liveInfo: StateFlow<FrameInfo?> = _liveInfo.asStateFlow()
+
     /** Single background thread for frame analysis; outlives camera rebinds on rotation. */
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
@@ -79,6 +87,18 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         analyzer.cooldownMs = _cooldownSeconds.value * 1_000L
         analyzer.vehicleScale = _vehicleScale.value
         PlateTextFilter.rules = _formatRules.value
+        applyShowLive(_showLive.value)
+    }
+
+    fun setShowLive(show: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_LIVE, show).apply()
+        _showLive.value = show
+        applyShowLive(show)
+    }
+
+    private fun applyShowLive(show: Boolean) {
+        analyzer.onFrameInfo = if (show) { info -> _liveInfo.value = info } else null
+        if (!show) _liveInfo.value = null
     }
 
     fun toggleRecording() {
@@ -86,6 +106,12 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         if (on) _recordingSince.value = SystemClock.elapsedRealtime()
         analyzer.enabled = on
         _recording.value = on
+        if (!on) {
+            // Save plates still being voted on. Runs on the analysis thread, after any frame
+            // that's mid-processing.
+            analysisExecutor.execute { analyzer.flush() }
+            _liveInfo.value = null
+        }
     }
 
     /** Runs plate recognition on a photo from the gallery and saves what it finds. */
@@ -194,6 +220,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val KEY_COOLDOWN = "cooldown_seconds"
         const val KEY_FORMAT_MODE = "format_mode"
+        const val KEY_SHOW_LIVE = "show_live_readings"
         const val KEY_FORMAT_MASKS = "format_masks"
         /** v2: multiple of the detected plate's width (v1 was of the text width). */
         const val KEY_VEHICLE_SCALE = "vehicle_scale_v2"
