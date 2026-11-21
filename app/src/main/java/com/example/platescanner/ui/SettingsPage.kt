@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -242,7 +243,7 @@ fun SettingsPage(
                         "No formats on: nothing will be saved.",
                         color = RecordRed,
                         fontSize = 11.sp,
-                        modifier = RowPadding.padding(bottom = 4.dp),
+                        modifier = RowPadding.padding(vertical = 12.dp),
                     )
                 }
             }
@@ -289,7 +290,7 @@ fun SettingsPage(
                         .fillMaxWidth()
                         .clickable(enabled = plates.isNotEmpty()) { confirmClear = true }
                         .then(RowPadding)
-                        .padding(vertical = 10.dp)
+                        .padding(vertical = 14.dp)
                         .alpha(if (plates.isNotEmpty()) 1f else 0.38f),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -344,7 +345,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             Modifier
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(PanelBg),
         ) {
             DividedColumn(content)
@@ -391,7 +392,7 @@ private fun SubLabel(text: String, enabled: Boolean = true) {
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
         modifier = RowPadding
-            .padding(top = 6.dp, bottom = 2.dp)
+            .padding(top = 12.dp, bottom = 10.dp)
             .alpha(if (enabled) 1f else 0.6f),
     )
 }
@@ -451,23 +452,28 @@ private fun ToggleRow(
             .fillMaxWidth()
             .clickable(enabled = enabled) { onChange(!checked) }
             .then(RowPadding)
-            .padding(vertical = 2.dp)
+            .padding(vertical = 14.dp)
             .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RowText(title, description, monospaceTitle, Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.Black,
-                checkedTrackColor = Accent,
-                disabledCheckedThumbColor = Color.Black,
-                disabledCheckedTrackColor = Accent,
-            ),
-        )
+        // Compact switch: drawn at 80% and kept to 26dp of row height (the row itself is the
+        // tap target, so the switch doesn't need its own 48dp touch area).
+        Box(Modifier.height(26.dp), contentAlignment = Alignment.Center) {
+            Switch(
+                checked = checked,
+                onCheckedChange = onChange,
+                enabled = enabled,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Black,
+                    checkedTrackColor = Accent,
+                    disabledCheckedThumbColor = Color.Black,
+                    disabledCheckedTrackColor = Accent,
+                ),
+                modifier = Modifier.scale(0.8f),
+            )
+        }
     }
 }
 
@@ -495,7 +501,7 @@ private fun SliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 8.dp, bottom = 2.dp)
+            .padding(top = 14.dp, bottom = 10.dp)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -505,6 +511,7 @@ private fun SliderRow(
                 trailing(current)
             }
         }
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Slider(
                 value = current,
@@ -525,7 +532,7 @@ private fun SliderRow(
                     disabledActiveTickColor = Color.Transparent,
                     disabledInactiveTickColor = Color.Transparent,
                 ),
-                modifier = Modifier.weight(1f).height(32.dp),
+                modifier = Modifier.weight(1f).height(28.dp),
             )
             Spacer(Modifier.width(10.dp))
             NumberBox(
@@ -593,10 +600,11 @@ private fun DurationSliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 6.dp)
+            .padding(top = 14.dp, bottom = 10.dp)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         RowText(title, description)
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Slider(
                 value = index,
@@ -621,13 +629,13 @@ private fun DurationSliderRow(
                     disabledActiveTickColor = Color.Transparent,
                     disabledInactiveTickColor = Color.Transparent,
                 ),
-                modifier = Modifier.weight(1f).height(32.dp),
+                modifier = Modifier.weight(1f).height(28.dp),
             )
             Spacer(Modifier.width(10.dp))
             Box(
                 Modifier
                     .width(68.dp)
-                    .height(30.dp)
+                    .height(26.dp)
                     .clip(RoundedCornerShape(5.dp))
                     .background(FieldColor)
                     .border(1.dp, if (focused) Accent else LineColor, RoundedCornerShape(5.dp))
@@ -673,7 +681,7 @@ private fun NumberBox(value: Float, decimals: Int, unit: String, enabled: Boolea
     Row(
         Modifier
             .width(68.dp)
-            .height(30.dp)
+            .height(26.dp)
             .clip(RoundedCornerShape(5.dp))
             .background(FieldColor)
             .border(1.dp, if (focused) Accent else LineColor, RoundedCornerShape(5.dp))
@@ -714,7 +722,7 @@ private fun ChoiceRow(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             Row(
@@ -731,7 +739,7 @@ private fun ChoiceRow(
                         modifier = Modifier
                             .background(if (i == selected) Color.White else Color.Transparent)
                             .clickable { onSelect(i) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }
@@ -749,14 +757,14 @@ private fun AddFormatRow(enabled: Boolean, onAdd: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(vertical = 4.dp)
+            .padding(vertical = 14.dp)
             .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
                 .weight(1f)
-                .height(30.dp)
+                .height(28.dp)
                 .clip(RoundedCornerShape(5.dp))
                 .background(FieldColor)
                 .border(1.dp, LineColor, RoundedCornerShape(5.dp))
