@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App icon: a plate caught in the camera's viewfinder with the app's green 'saved' marker. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="1.0" android:scaleY="1.0" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M30,30h10v3h-7v7h-3z M78,30h-10v3h7v7h3z M30,78h10v-3h-7v-7h-3z M78,78h-10v-3h7v-7h3z" />
+        <path android:fillColor="#FF2ECC71" android:pathData="M38.5,42h31.0a2.5,2.5 0,0 1,2.5,2.5v19.0a2.5,2.5 0,0 1,-2.5,2.5h-31.0a2.5,2.5 0,0 1,-2.5,-2.5v-19.0a2.5,2.5 0,0 1,2.5,-2.5z" />
+        <path android:fillColor="#FFF4F4F2" android:pathData="M37.5,47h33v14h-33z" />
+        <path android:strokeColor="#FF111418" android:strokeWidth="1.25" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M40.40,57.50L42.10,50.50L43.80,57.50M41.00,55.10H43.20M44.70,50.50V57.50H46.70Q48.10,57.50 48.10,55.70Q48.10,54.00 46.60,54.00H44.70M44.70,50.50H46.60Q47.80,50.50 47.80,52.25Q47.80,54.00 46.60,54.00M52.40,51.60Q52.00,50.50 50.80,50.50Q49.00,50.50 49.00,54.00Q49.00,57.50 50.80,57.50Q52.00,57.50 52.40,56.40M56.20,52.00L57.70,50.50V57.50M60.00,52.00Q60.40,50.50 61.60,50.50Q63.20,50.50 63.20,52.40Q63.20,53.90 59.90,57.50H63.30M64.30,51.30Q64.80,50.50 65.90,50.50Q67.50,50.50 67.50,52.25Q67.50,53.90 65.60,53.90Q67.60,53.90 67.60,55.70Q67.60,57.50 65.90,57.50Q64.70,57.50 64.20,56.70" />
+        <path android:fillColor="#FF111418" android:pathData="M47,43.8h14v1.6h-14z" />
+    </group>
+</vector>
