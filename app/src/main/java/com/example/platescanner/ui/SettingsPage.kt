@@ -98,18 +98,18 @@ private val RowPadding = Modifier.padding(horizontal = CardPad)
 /** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
 private val PillHeight = 22.dp
 /** Every control's corner radius; the card corner is this + [CardPad], so they're concentric. */
-private val ControlRadius = 4.dp // card corner (12) − CardPad (8): controls are concentric with cards
-private val PillShape = RoundedCornerShape(ControlRadius)
+private val ControlRadius = 11.dp // half of PillHeight: every control has fully round ends
+private val PillShape = RoundedCornerShape(50)
 private val PillBg = Color.White.copy(alpha = 0.08f)
 
 /**
  * Geometry: every control in a card (slider thumb, number box, switch, selector, buttons) is a
- * 22dp tall with [ControlRadius] (4dp) corners and rows are padded [CardPad] (8dp) on all sides,
- * so cards use 4 + 8 = 12dp corners and a control in a card's corner is concentric with it.
+ * 22dp pill or circle (radius 11dp) and rows are padded [CardPad] (8dp) on all sides. Cards use
+ * 12dp corners (squarer than the strictly concentric 11 + 8 = 19dp, by choice).
  */
-private val CardShape = RoundedCornerShape(ControlRadius + CardPad)
+private val CardShape = RoundedCornerShape(12.dp)
 
-/** Slider with a 22dp thumb using the same corner radius as the other controls. */
+/** Slider with a round thumb the same height as the other controls (22dp). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PillSlider(
@@ -145,30 +145,11 @@ private fun PillSlider(
             Box(
                 Modifier
                     .size(PillHeight)
-                    .clip(PillShape)
+                    .clip(CircleShape)
                     .background(Color.White)
             )
         },
-        track = { state ->
-            // Square-ended track to match the squared controls.
-            val range = state.valueRange
-            val fraction = if (range.endInclusive > range.start)
-                ((state.value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f) else 0f
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(PillBg)
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(fraction)
-                        .fillMaxHeight()
-                        .background(Accent)
-                )
-            }
-        },
+        track = { state -> SliderDefaults.Track(sliderState = state, colors = colors, enabled = enabled) },
         modifier = modifier.height(PillHeight),
     )
 }
@@ -577,8 +558,8 @@ private fun ToggleRow(
 }
 
 /**
- * Switch drawn to match the other controls: 38×22 with [ControlRadius] corners and a 16dp knob
- * inset 3dp whose corners are 3dp tighter (concentric).
+ * Switch drawn to match the other controls: a 38×22 pill with a round 16dp knob inset 3dp
+ * (concentric with the pill's ends).
  */
 @Composable
 private fun CompactSwitch(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
@@ -595,7 +576,7 @@ private fun CompactSwitch(checked: Boolean, enabled: Boolean, onChange: (Boolean
             Modifier
                 .offset(x = knobX, y = 3.dp)
                 .size(16.dp)
-                .clip(RoundedCornerShape(ControlRadius - 3.dp))
+                .clip(CircleShape)
                 .background(if (checked) Color.Black else Color.White.copy(alpha = 0.85f))
         )
     }
@@ -825,7 +806,7 @@ private fun ChoiceRow(
     Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = CardPad)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            // Track with the selected option inset 2dp; its corners are 2dp tighter (concentric).
+            // Pill track with a pill-shaped selected option inset 2dp (concentric).
             Row(
                 Modifier
                     .height(PillHeight)
@@ -838,7 +819,7 @@ private fun ChoiceRow(
                     Box(
                         Modifier
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(ControlRadius - 2.dp))
+                            .clip(PillShape)
                             .background(if (i == selected) Color.White else Color.Transparent)
                             .clickable { onSelect(i) }
                             .padding(horizontal = 10.dp),
