@@ -88,7 +88,35 @@ class PlateAnalyzer(
 
     var agreeReads: Int
         get() = tracker.agreeReads
-        set(value) { tracker.agreeReads = value }
+        set(value) {
+            tracker.agreeReads = value
+            retime()
+        }
+
+    /** 0 = video frames; otherwise the interval between still photos (Settings). */
+    var photoIntervalMs: Long = 0
+        set(value) {
+            field = value
+            retime()
+        }
+
+    /**
+     * Video gives several images a second; photos may be seconds apart, so a passing car may
+     * appear in only one or two. In photo mode a single (sharp, full-resolution) read is
+     * enough for the fallback save, and "gone" / "waited long enough" scale with the interval.
+     */
+    private fun retime() {
+        val interval = photoIntervalMs
+        if (interval <= 0) {
+            tracker.minReads = 2
+            tracker.settleMs = 1_200
+            tracker.maxWaitMs = 3_000
+        } else {
+            tracker.minReads = 1
+            tracker.settleMs = (interval * 3 / 2 + 500)
+            tracker.maxWaitMs = maxOf(3_000L, interval * tracker.agreeReads + 500)
+        }
+    }
 
     /** Optional: receives what was read in each frame (Settings → Show live readings). */
     @Volatile var onFrameInfo: ((FrameInfo) -> Unit)? = null

@@ -32,11 +32,16 @@ import kotlin.math.sqrt
  *
  * Methods are synchronized: frames arrive on the analysis thread, [flush] on the main thread.
  */
-class PlateTracker(
-    private val minReads: Int = 2,
-    private val settleMs: Long = 1_200,
-    private val maxWaitMs: Long = 3_000,
-) {
+class PlateTracker {
+    /** Reads needed before a vote-based save; one-off reads are usually noise. */
+    @Volatile var minReads: Int = 2
+
+    /** Out of view this long = gone. */
+    @Volatile var settleMs: Long = 1_200
+
+    /** Longest a plate stays unsaved while in view before falling back to the vote. */
+    @Volatile var maxWaitMs: Long = 3_000
+
     /** Changed from Settings. */
     @Volatile var cooldownMs: Long = 15_000
 

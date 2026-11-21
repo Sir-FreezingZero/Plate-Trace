@@ -33,6 +33,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
+/** Where plates are read from (Settings). */
+enum class CaptureMode { VIDEO, PHOTO }
+
 /** Short message shown on the camera screen. */
 data class Notice(val text: String, val kind: Kind) {
     enum class Kind { NEW_PLATE, REPEAT_PLATE, WATCH, INFO }
@@ -71,6 +74,15 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _vehicleScale = MutableStateFlow(loadVehicleScale())
     val vehicleScale: StateFlow<Float> = _vehicleScale.asStateFlow()
 
+    private val _captureMode = MutableStateFlow(
+        runCatching { CaptureMode.valueOf(prefs.getString(KEY_CAPTURE_MODE, null) ?: "VIDEO") }
+            .getOrDefault(CaptureMode.VIDEO)
+    )
+    val captureMode: StateFlow<CaptureMode> = _captureMode.asStateFlow()
+
+    private val _photoIntervalMs = MutableStateFlow(prefs.getLong(KEY_PHOTO_INTERVAL, 1_000L))
+    val photoIntervalMs: StateFlow<Long> = _photoIntervalMs.asStateFlow()
+
     private val _agreeReads = MutableStateFlow(prefs.getInt(KEY_AGREE_READS, 3))
     val agreeReads: StateFlow<Int> = _agreeReads.asStateFlow()
 
@@ -92,6 +104,24 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         PlateTextFilter.rules = _formatRules.value
         applyShowLive(_showLive.value)
         analyzer.agreeReads = _agreeReads.value
+        applyCapture()
+    }
+
+    fun setCaptureMode(mode: CaptureMode) {
+        prefs.edit().putString(KEY_CAPTURE_MODE, mode.name).apply()
+        _captureMode.value = mode
+        applyCapture()
+    }
+
+    fun setPhotoInterval(ms: Long) {
+        prefs.edit().putLong(KEY_PHOTO_INTERVAL, ms).apply()
+        _photoIntervalMs.value = ms
+        applyCapture()
+    }
+
+    private fun applyCapture() {
+        analyzer.photoIntervalMs =
+            if (_captureMode.value == CaptureMode.PHOTO) _photoIntervalMs.value else 0L
     }
 
     fun setAgreeReads(count: Int) {
@@ -232,6 +262,8 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_FORMAT_MODE = "format_mode"
         const val KEY_SHOW_LIVE = "show_live_readings"
         const val KEY_AGREE_READS = "agree_reads"
+        const val KEY_CAPTURE_MODE = "capture_mode"
+        const val KEY_PHOTO_INTERVAL = "photo_interval_ms"
         const val KEY_FORMAT_MASKS = "format_masks"
         /** v2: multiple of the detected plate's width (v1 was of the text width). */
         const val KEY_VEHICLE_SCALE = "vehicle_scale_v2"

@@ -56,6 +56,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.platescanner.CaptureMode
 import com.example.platescanner.PlateViewModel
 import com.example.platescanner.data.PlateEntity
 import com.example.platescanner.scan.FormatMode
@@ -63,6 +64,8 @@ import com.example.platescanner.scan.PlateTextFilter
 import kotlin.math.roundToInt
 
 private val AgreeOptions = listOf(2, 3, 4, 5)
+
+private val PhotoIntervals = listOf(500L to "0.5 s", 1_000L to "1 s", 2_000L to "2 s", 3_000L to "3 s")
 
 private val CooldownOptions = listOf(5 to "5 s", 15 to "15 s", 60 to "1 min", 300 to "5 min")
 
@@ -96,6 +99,8 @@ fun SettingsPage(
     val scale by viewModel.vehicleScale.collectAsStateWithLifecycle()
     val showLive by viewModel.showLive.collectAsStateWithLifecycle()
     val agree by viewModel.agreeReads.collectAsStateWithLifecycle()
+    val captureMode by viewModel.captureMode.collectAsStateWithLifecycle()
+    val photoInterval by viewModel.photoIntervalMs.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
 
@@ -143,6 +148,47 @@ fun SettingsPage(
 
             // --- Capture --------------------------------------------------------------
             SectionLabel("Capture")
+            SettingBlock(
+                title = "Read plates from",
+                body = if (captureMode == CaptureMode.VIDEO) {
+                    "Video: reads the live camera feed (1080p), several images a second. " +
+                        "Best for moving traffic."
+                } else {
+                    "Photos: takes a full-resolution photo at a set interval and reads that. " +
+                        "Sharper on many phones and reads plates further away, but fewer " +
+                        "images per second, so fast-passing cars may be missed."
+                },
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OptionChip("Video", selected = captureMode == CaptureMode.VIDEO) {
+                        viewModel.setCaptureMode(CaptureMode.VIDEO)
+                    }
+                    OptionChip("Photos", selected = captureMode == CaptureMode.PHOTO) {
+                        viewModel.setCaptureMode(CaptureMode.PHOTO)
+                    }
+                }
+                if (captureMode == CaptureMode.PHOTO) {
+                    Text(
+                        "Take a photo every",
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PhotoIntervals.forEach { (ms, label) ->
+                            OptionChip(label, selected = photoInterval == ms) {
+                                viewModel.setPhotoInterval(ms)
+                            }
+                        }
+                    }
+                    Text(
+                        "If the phone needs longer than this to read a photo, the next one " +
+                            "is taken as soon as it's done.",
+                        color = Muted,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
             SettingBlock(
                 title = "Matching readings to save",
                 body = "How many frames must read exactly the same text before a plate is " +

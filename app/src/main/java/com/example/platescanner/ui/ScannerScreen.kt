@@ -79,6 +79,8 @@ fun ScannerScreen(viewModel: PlateViewModel) {
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val recordingSince by viewModel.recordingSince.collectAsStateWithLifecycle()
     val liveInfo by viewModel.liveInfo.collectAsStateWithLifecycle()
+    val captureMode by viewModel.captureMode.collectAsStateWithLifecycle()
+    val photoIntervalMs by viewModel.photoIntervalMs.collectAsStateWithLifecycle()
     var openPanel by rememberSaveable { mutableStateOf(OpenPanel.None) }
 
     var notice by remember { mutableStateOf<Notice?>(null) }
@@ -132,6 +134,9 @@ fun ScannerScreen(viewModel: PlateViewModel) {
         CameraPreview(
             analyzer = viewModel.analyzer,
             analysisExecutor = viewModel.analysisExecutor,
+            mode = captureMode,
+            photoIntervalMs = photoIntervalMs,
+            recording = recording,
             modifier = Modifier.fillMaxSize(),
         )
         liveInfo?.let { LiveBoxes(it, Modifier.fillMaxSize()) }

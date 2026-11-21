@@ -91,60 +91,82 @@ private fun PlateMarker(b: LiveBox, r: Rect, viewW: Float) {
     val density = LocalDensity.current
     val color = b.color()
 
-    // Plain thin rectangle.
+    // Thin box with slightly rounded corners and a dark hairline outside it, so it stays
+    // visible on bright cars and sky.
     Canvas(
         Modifier
             .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
             .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
     ) {
-        drawRect(color, style = Stroke(1.5.dp.toPx()))
+        val radius = CornerRadius(3.dp.toPx())
+        val sw = 1.5.dp.toPx()
+        drawRoundRect(
+            Color.Black.copy(alpha = 0.35f),
+            topLeft = androidx.compose.ui.geometry.Offset(-sw, -sw),
+            size = androidx.compose.ui.geometry.Size(size.width + 2 * sw, size.height + 2 * sw),
+            cornerRadius = radius,
+            style = Stroke(sw),
+        )
+        drawRoundRect(color, cornerRadius = radius, style = Stroke(sw))
     }
 
-    // Tag attached to the box's top-left corner, kept on screen.
+    // Tab attached to the box's top-left corner, kept on screen.
     Box(
         Modifier.layout { measurable, _ ->
             val p = measurable.measure(Constraints())
             layout(0, 0) {
                 val x = r.left.roundToInt().coerceIn(0, max(0, viewW.roundToInt() - p.width))
-                val y = (r.top.roundToInt() - p.height).coerceAtLeast(0)
+                val y = (r.top.roundToInt() - p.height + 1).coerceAtLeast(0)
                 p.place(x, y)
             }
         }
     ) {
-        Text(
-            tagText(b),
-            color = Color.Black,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
-            maxLines = 1,
-            modifier = Modifier
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
                 .background(color)
-                .padding(horizontal = 4.dp, vertical = 1.dp),
-        )
+                .padding(horizontal = 5.dp, vertical = 1.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                b.savedText ?: b.text ?: "?",
+                color = Color.Black,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                maxLines = 1,
+            )
+            Text(
+                " " + tagStatus(b),
+                color = Color.Black.copy(alpha = 0.6f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+        }
     }
 }
 
-/** e.g. "LXC15M 2/3", "LXC15M ✓", "LXC1SM ?" (unsure), "SALE50 ✕" (not a plate format). */
-private fun tagText(b: LiveBox): String = when {
-    b.saved -> "${b.savedText ?: b.text} ✓"
-    b.accepted -> "${b.text} ${b.matches}/${b.needed}"
-    b.reason == "format" -> "${b.text ?: "?"} ✕"
-    else -> "${b.text ?: ""} ?".trim()
+/** Small status after the plate number: "2/3", "✓", "?" (unsure), "✕" (not a plate format). */
+private fun tagStatus(b: LiveBox): String = when {
+    b.saved -> "✓"
+    b.accepted -> "${b.matches}/${b.needed}"
+    b.reason == "format" -> "✕"
+    else -> "?"
 }
 
 /** Small stats line shown under the recording timer when live readings are on. */
 @Composable
 fun LiveStats(info: FrameInfo, modifier: Modifier = Modifier) {
-    val fps = if (info.millis > 0) 1000f / info.millis else 0f
     Text(
-        "%dp · %.1f fps".format(min(info.width, info.height), fps),
+        "${info.width}×${info.height} · ${info.millis} ms",
         color = Color.White.copy(alpha = 0.75f),
         fontSize = 10.sp,
         fontFamily = FontFamily.Monospace,
         modifier = modifier
             .padding(top = 4.dp)
+            .clip(RoundedCornerShape(4.dp))
             .background(LabelGlass)
-            .padding(horizontal = 6.dp, vertical = 1.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
