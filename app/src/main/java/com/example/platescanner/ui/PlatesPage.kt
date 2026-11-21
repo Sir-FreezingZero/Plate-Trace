@@ -206,6 +206,7 @@ fun PlatesPage(
                     viewModel = viewModel,
                     onToggleWatch = toggleWatch,
                     onToggleStar = toggleStar,
+                    onOpenPlate = { selectedId = it },
                     onBack = { selectedId = null },
                 )
             }
@@ -757,6 +758,7 @@ private fun PlateDetail(
     viewModel: PlateViewModel,
     onToggleWatch: (PlateEntity) -> Unit,
     onToggleStar: (PlateEntity) -> Unit,
+    onOpenPlate: (Long) -> Unit,
     onBack: () -> Unit,
 ) {
     val plateFlow = remember(plateId) { viewModel.plate(plateId) }
@@ -766,7 +768,6 @@ private fun PlateDetail(
     var loaded by remember(plateId) { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<SightingEntity?>(null) }
-    var mergeCandidate by remember { mutableStateOf<PlateEntity?>(null) }
     val allPlates by viewModel.plates.collectAsStateWithLifecycle()
     val similar = plate?.let { p ->
         allPlates.filter { it.id != p.id && PlateTracker.similar(it.plateNumber, p.plateNumber, loose = true) }
@@ -854,7 +855,7 @@ private fun PlateDetail(
                 item(key = "similar") {
                     Column(Modifier.padding(bottom = 12.dp)) {
                         Text(
-                            "SIMILAR PLATES · LIKELY MISREADS · TAP TO MERGE",
+                            "SIMILAR PLATES · LIKELY MISREADS",
                             color = Muted,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -875,7 +876,7 @@ private fun PlateDetail(
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(FieldColor)
                                         .border(1.dp, LineColor, RoundedCornerShape(6.dp))
-                                        .clickable { mergeCandidate = other }
+                                        .clickable { onOpenPlate(other.id) }
                                         .padding(horizontal = 10.dp, vertical = 6.dp),
                                 )
                             }
@@ -904,31 +905,6 @@ private fun PlateDetail(
                     onClick = { viewing = s },
                 )
             }
-        }
-    }
-
-    mergeCandidate?.let { other ->
-        val into = plate
-        if (into != null) {
-            AlertDialog(
-                onDismissRequest = { mergeCandidate = null },
-                title = { Text("Merge ${other.plateNumber} into ${into.plateNumber}?") },
-                text = {
-                    Text(
-                        "Its ${other.sightingCount} sighting(s) and photos move to ${into.plateNumber}, " +
-                            "and ${other.plateNumber} is removed."
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        viewModel.merge(other.id, into.id)
-                        mergeCandidate = null
-                    }) { Text("Merge") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { mergeCandidate = null }) { Text("Cancel") }
-                },
-            )
         }
     }
 
