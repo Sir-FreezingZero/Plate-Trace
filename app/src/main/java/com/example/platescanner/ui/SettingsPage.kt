@@ -30,6 +30,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.draw.drawWithContent
@@ -95,17 +97,20 @@ private val RowPadding = Modifier.padding(horizontal = CardPad)
 
 /** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
 private val PillHeight = 26.dp
-private val PillShape = RoundedCornerShape(50)
+/** Every control's corner radius; the card corner is this + [CardPad], so they're concentric. */
+private val ControlRadius = 8.dp
+private val PillShape = RoundedCornerShape(ControlRadius)
 private val PillBg = Color.White.copy(alpha = 0.08f)
 
 /**
- * Geometry: every control in a card (slider thumb, number pill, switch, selector) is a 26dp pill
- * (radius 13dp), rows are padded [CardPad] on all sides, and the card's corner radius is
- * 13 + 10 = 23dp — so a control in a card's corner is concentric with that corner.
+ * Geometry: every control in a card (slider thumb, number box, switch, selector, buttons) is
+ * 26dp tall with [ControlRadius] corners, rows are padded [CardPad] on all sides, and the card's
+ * corner radius is ControlRadius + CardPad — so a control in a card's corner is concentric with
+ * that corner.
  */
-private val CardShape = RoundedCornerShape(23.dp)
+private val CardShape = RoundedCornerShape(ControlRadius + CardPad)
 
-/** Slider with a 26dp round thumb (same radius as the pills and the card corner geometry). */
+/** Slider with a 26dp thumb using the same corner radius as the other controls. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PillSlider(
@@ -141,7 +146,7 @@ private fun PillSlider(
             Box(
                 Modifier
                     .size(PillHeight)
-                    .clip(CircleShape)
+                    .clip(PillShape)
                     .background(Color.White)
             )
         },
@@ -543,31 +548,38 @@ private fun ToggleRow(
             .then(RowPadding)
             .padding(vertical = CardPad)
             .alpha(if (enabled) 1f else 0.38f),
-        verticalAlignment = Alignment.CenterVertically,
+        // Top-aligned: in a card's first row the switch sits CardPad from the top and right
+        // edges, concentric with the card's top-right corner.
+        verticalAlignment = Alignment.Top,
     ) {
         RowText(title, description, monospaceTitle, Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        // Compact switch: drawn at 80% (≈26dp tall, same as the pills) and kept to 26dp of row
-        // height (the row itself is the tap target). Right-aligned with the pills.
-        Box(Modifier.height(26.dp), contentAlignment = Alignment.CenterEnd) {
-            Switch(
-                checked = checked,
-                onCheckedChange = onChange,
-                enabled = enabled,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.Black,
-                    checkedTrackColor = Accent,
-                    disabledCheckedThumbColor = Color.Black,
-                    disabledCheckedTrackColor = Accent,
-                ),
-                // Shrink toward the right edge so the switch lines up with the pills below.
-                modifier = Modifier.graphicsLayer {
-                    scaleX = 0.8f
-                    scaleY = 0.8f
-                    transformOrigin = TransformOrigin(1f, 0.5f)
-                },
-            )
-        }
+        CompactSwitch(checked = checked, enabled = enabled, onChange = onChange)
+    }
+}
+
+/**
+ * Switch drawn to match the other controls: 44×26, [ControlRadius] corners, with a 20dp knob
+ * inset 3dp whose corners are concentric with the track (8 − 3 = 5dp).
+ */
+@Composable
+private fun CompactSwitch(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    val knobX by animateDpAsState(if (checked) 21.dp else 3.dp, label = "knob")
+    Box(
+        Modifier
+            .width(44.dp)
+            .height(PillHeight)
+            .clip(PillShape)
+            .background(if (checked) Accent else PillBg)
+            .clickable(enabled = enabled) { onChange(!checked) },
+    ) {
+        Box(
+            Modifier
+                .offset(x = knobX, y = 3.dp)
+                .size(20.dp)
+                .clip(RoundedCornerShape(ControlRadius - 3.dp))
+                .background(if (checked) Color.Black else Color.White.copy(alpha = 0.85f))
+        )
     }
 }
 
@@ -795,7 +807,7 @@ private fun ChoiceRow(
     Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = CardPad)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            // Pill track with a pill-shaped selected option inset 2dp (concentric).
+            // Track with the selected option inset 2dp; its corners are 2dp tighter (concentric).
             Row(
                 Modifier
                     .height(PillHeight)
@@ -808,7 +820,7 @@ private fun ChoiceRow(
                     Box(
                         Modifier
                             .fillMaxHeight()
-                            .clip(PillShape)
+                            .clip(RoundedCornerShape(ControlRadius - 2.dp))
                             .background(if (i == selected) Color.White else Color.Transparent)
                             .clickable { onSelect(i) }
                             .padding(horizontal = 10.dp),
