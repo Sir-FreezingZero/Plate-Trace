@@ -83,7 +83,7 @@ private val FormatPresets = listOf(
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
 )
 
-private val RowPadding = Modifier.padding(horizontal = 14.dp)
+private val RowPadding = Modifier.padding(horizontal = 12.dp)
 
 /** Full-screen settings page; recording keeps running underneath. */
 @Composable
@@ -243,7 +243,7 @@ fun SettingsPage(
                         "No formats on: nothing will be saved.",
                         color = RecordRed,
                         fontSize = 11.sp,
-                        modifier = RowPadding.padding(vertical = 12.dp),
+                        modifier = RowPadding.padding(vertical = 8.dp),
                     )
                 }
             }
@@ -290,7 +290,7 @@ fun SettingsPage(
                         .fillMaxWidth()
                         .clickable(enabled = plates.isNotEmpty()) { confirmClear = true }
                         .then(RowPadding)
-                        .padding(vertical = 14.dp)
+                        .padding(vertical = 10.dp)
                         .alpha(if (plates.isNotEmpty()) 1f else 0.38f),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -339,7 +339,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 26.dp, end = 26.dp, bottom = 6.dp),
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 6.dp),
         )
         Box(
             Modifier
@@ -363,7 +363,7 @@ private fun DividedColumn(content: @Composable () -> Unit) {
             .fillMaxWidth()
             .drawWithContent {
                 drawContent()
-                val inset = 14.dp.toPx()
+                val inset = 12.dp.toPx()
                 for (y in lineYs) {
                     drawLine(RowLine, Offset(inset, y.toFloat()), Offset(size.width - inset, y.toFloat()), 1f)
                 }
@@ -392,7 +392,7 @@ private fun SubLabel(text: String, enabled: Boolean = true) {
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
         modifier = RowPadding
-            .padding(top = 12.dp, bottom = 10.dp)
+            .padding(top = 8.dp, bottom = 6.dp)
             .alpha(if (enabled) 1f else 0.6f),
     )
 }
@@ -452,7 +452,7 @@ private fun ToggleRow(
             .fillMaxWidth()
             .clickable(enabled = enabled) { onChange(!checked) }
             .then(RowPadding)
-            .padding(vertical = 14.dp)
+            .padding(vertical = 10.dp)
             .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -501,7 +501,7 @@ private fun SliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 14.dp, bottom = 10.dp)
+            .padding(top = 10.dp, bottom = 6.dp)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -600,7 +600,7 @@ private fun DurationSliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 14.dp, bottom = 10.dp)
+            .padding(top = 10.dp, bottom = 6.dp)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         RowText(title, description)
@@ -722,7 +722,7 @@ private fun ChoiceRow(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 14.dp)) {
+    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             Row(
@@ -757,7 +757,7 @@ private fun AddFormatRow(enabled: Boolean, onAdd: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(vertical = 14.dp)
+            .padding(vertical = 10.dp)
             .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
