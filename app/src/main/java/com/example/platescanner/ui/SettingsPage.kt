@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -84,6 +85,36 @@ private val FormatPresets = listOf(
 )
 
 private val RowPadding = Modifier.padding(horizontal = 12.dp)
+
+/** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
+private val PillHeight = 26.dp
+private val PillShape = RoundedCornerShape(50)
+private val PillBg = Color.White.copy(alpha = 0.08f)
+
+/** Card corners are concentric with the pills: 12dp row padding + 13dp pill radius ≈ 26dp. */
+private val CardShape = RoundedCornerShape(26.dp)
+
+/** Small tinted pill button, e.g. "Add", "Delete all". */
+@Composable
+private fun PillButton(text: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .height(PillHeight)
+            .clip(PillShape)
+            .background(if (enabled) color.copy(alpha = 0.16f) else PillBg)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = if (enabled) color else Muted,
+            fontSize = 13.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
 
 /** Full-screen settings page; recording keeps running underneath. */
 @Composable
@@ -288,17 +319,21 @@ fun SettingsPage(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = plates.isNotEmpty()) { confirmClear = true }
                         .then(RowPadding)
-                        .padding(vertical = 10.dp)
-                        .alpha(if (plates.isNotEmpty()) 1f else 0.38f),
+                        .padding(vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RowText(
-                        title = "Delete all plates",
+                        title = "Saved data",
                         description = "${plates.size} plates · $sightings sightings · on this phone only",
-                        titleColor = RecordRed,
                         modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    PillButton(
+                        "Delete all",
+                        color = RecordRed,
+                        enabled = plates.isNotEmpty(),
+                        onClick = { confirmClear = true },
                     )
                 }
             }
@@ -334,19 +369,19 @@ fun SettingsPage(
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
         Text(
-            title.uppercase(),
+            title,
             color = Muted,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 6.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 26.dp, end = 26.dp, bottom = 8.dp),
         )
         Box(
             Modifier
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(PanelBg),
+                .clip(CardShape)
+                .background(PanelBg)
+                .border(1.dp, LineColor, CardShape),
         ) {
             DividedColumn(content)
         }
@@ -363,9 +398,8 @@ private fun DividedColumn(content: @Composable () -> Unit) {
             .fillMaxWidth()
             .drawWithContent {
                 drawContent()
-                val inset = 12.dp.toPx()
                 for (y in lineYs) {
-                    drawLine(RowLine, Offset(inset, y.toFloat()), Offset(size.width - inset, y.toFloat()), 1f)
+                    drawLine(RowLine, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), 1f)
                 }
             },
     ) { measurables, constraints ->
@@ -635,11 +669,11 @@ private fun DurationSliderRow(
             Box(
                 Modifier
                     .width(68.dp)
-                    .height(26.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(FieldColor)
-                    .border(1.dp, if (focused) Accent else LineColor, RoundedCornerShape(5.dp))
-                    .padding(horizontal = 6.dp),
+                    .height(PillHeight)
+                    .clip(PillShape)
+                    .background(PillBg)
+                    .border(1.dp, if (focused) Accent else Color.Transparent, PillShape)
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 BasicTextField(
@@ -681,11 +715,11 @@ private fun NumberBox(value: Float, decimals: Int, unit: String, enabled: Boolea
     Row(
         Modifier
             .width(68.dp)
-            .height(26.dp)
-            .clip(RoundedCornerShape(5.dp))
-            .background(FieldColor)
-            .border(1.dp, if (focused) Accent else LineColor, RoundedCornerShape(5.dp))
-            .padding(horizontal = 6.dp),
+            .height(PillHeight)
+            .clip(PillShape)
+            .background(PillBg)
+            .border(1.dp, if (focused) Accent else Color.Transparent, PillShape)
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BasicTextField(
@@ -725,22 +759,33 @@ private fun ChoiceRow(
     Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            // Pill track with a pill-shaped selected option inset 2dp (concentric).
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, LineColor, RoundedCornerShape(6.dp)),
+                    .height(PillHeight)
+                    .clip(PillShape)
+                    .background(PillBg)
+                    .padding(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 options.forEachIndexed { i, label ->
-                    Text(
-                        label,
-                        color = if (i == selected) Color.Black else Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = if (i == selected) FontWeight.SemiBold else FontWeight.Normal,
-                        modifier = Modifier
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .clip(PillShape)
                             .background(if (i == selected) Color.White else Color.Transparent)
                             .clickable { onSelect(i) }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            color = if (i == selected) Color.Black else Color.White,
+                            fontSize = 12.sp,
+                            lineHeight = 14.sp,
+                            fontWeight = if (i == selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    }
                 }
             }
         }
@@ -764,11 +809,10 @@ private fun AddFormatRow(enabled: Boolean, onAdd: (String) -> Unit) {
         Box(
             Modifier
                 .weight(1f)
-                .height(28.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(FieldColor)
-                .border(1.dp, LineColor, RoundedCornerShape(5.dp))
-                .padding(horizontal = 8.dp),
+                .height(PillHeight)
+                .clip(PillShape)
+                .background(PillBg)
+                .padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (text.isEmpty()) {
@@ -789,17 +833,14 @@ private fun AddFormatRow(enabled: Boolean, onAdd: (String) -> Unit) {
             )
         }
         Spacer(Modifier.width(8.dp))
-        Text(
+        PillButton(
             "Add",
-            color = if (enabled && cleaned != null) Accent else Muted,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .clickable(enabled = enabled && cleaned != null) {
-                    cleaned?.let(onAdd)
-                    text = ""
-                }
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+            color = Accent,
+            enabled = enabled && cleaned != null,
+            onClick = {
+                cleaned?.let(onAdd)
+                text = ""
+            },
         )
     }
 }
