@@ -1230,8 +1230,8 @@ private fun PlateBadge(number: String, fontSize: TextUnit) {
 }
 
 /**
- * Full-screen view of a plate's sightings: car shot, plate crop and a details card (plate, read
- * text, date, time, place, coordinates). Swipe left/right between sightings.
+ * Full-screen view of a plate's sightings: car shot, plate crop with the reading, then date,
+ * time, place and coordinates as plain labelled values. Swipe left/right between sightings.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1283,9 +1283,9 @@ private fun SightingPage(s: SightingEntity, plateNumber: String) {
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
+        // Car shot
         if (s.vehicleImagePath != null) {
             AsyncImage(
                 model = File(s.vehicleImagePath),
@@ -1293,73 +1293,106 @@ private fun SightingPage(s: SightingEntity, plateNumber: String) {
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(ThumbBackground),
             )
+            Spacer(Modifier.height(10.dp))
         }
-        AsyncImage(
-            model = File(s.imagePath),
-            contentDescription = "Plate",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(ThumbBackground),
-        )
 
-        // Details card
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(FieldColor)
-                .border(1.dp, LineColor, RoundedCornerShape(10.dp)),
-        ) {
-            DetailRow("Plate", plateNumber, monospace = true)
-            if (s.rawText.isNotBlank() && s.rawText != plateNumber) {
-                DetailDivider()
-                DetailRow("Read as", s.rawText, monospace = true)
-            }
-            DetailDivider()
-            DetailRow("Date", fullDate(s.timestamp))
-            DetailDivider()
-            DetailRow("Time", "${fullTime(s.timestamp)} · ${relative(s.timestamp)}")
-            DetailDivider()
-            val place = placeText(s)
-            DetailRow(
-                "Location",
-                place ?: if (s.latitude != null) "Address not looked up" else "Not recorded",
-                muted = place == null,
+        // Plate crop + what was read
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = File(s.imagePath),
+                contentDescription = "Plate",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(72.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ThumbBackground),
             )
-            coordsText(s)?.let {
-                DetailDivider()
-                SelectionContainer { DetailRow("Coordinates", it, monospace = true) }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Label("Plate")
+                Text(
+                    plateNumber,
+                    fontSize = 22.sp,
+                    lineHeight = 26.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                if (s.rawText.isNotBlank() && s.rawText != plateNumber) {
+                    Text(
+                        "read as ${s.rawText}",
+                        color = Muted,
+                        fontSize = 12.sp,
+                        lineHeight = 15.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(Modifier.padding(vertical = 16.dp), color = LineColor)
+
+        Row {
+            LabeledValue("Date", fullDate(s.timestamp), Modifier.weight(1f))
+            Spacer(Modifier.width(14.dp))
+            LabeledValue("Time", fullTime(s.timestamp), Modifier.weight(1f), sub = relative(s.timestamp))
+        }
+        Spacer(Modifier.height(16.dp))
+        val place = placeText(s)
+        LabeledValue(
+            "Location",
+            place ?: if (s.latitude != null) "Address not looked up" else "Not recorded",
+            muted = place == null,
+        )
+        coordsText(s)?.let {
+            Spacer(Modifier.height(16.dp))
+            SelectionContainer {
+                LabeledValue("Coordinates", it, monospace = true, sub = "Press and hold to copy")
             }
         }
     }
 }
 
 @Composable
-private fun DetailRow(label: String, value: String, monospace: Boolean = false, muted: Boolean = false) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(label, color = Muted, fontSize = 12.sp, lineHeight = 18.sp, modifier = Modifier.width(92.dp))
+private fun Label(text: String) {
+    Text(
+        text.uppercase(),
+        color = Muted,
+        fontSize = 10.sp,
+        lineHeight = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.sp,
+    )
+}
+
+@Composable
+private fun LabeledValue(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    monospace: Boolean = false,
+    muted: Boolean = false,
+    sub: String? = null,
+) {
+    Column(modifier) {
+        Label(label)
+        Spacer(Modifier.height(3.dp))
         Text(
             value,
             color = if (muted) Muted else Color.White,
-            fontSize = 14.sp,
-            lineHeight = 18.sp,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
-            fontWeight = if (monospace) FontWeight.SemiBold else FontWeight.Normal,
         )
+        if (sub != null) {
+            Text(sub, color = Muted, fontSize = 11.sp, lineHeight = 14.sp)
+        }
     }
-}
-
-@Composable
-private fun DetailDivider() {
-    HorizontalDivider(Modifier.padding(horizontal = 14.dp), color = LineColor)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1410,9 +1443,9 @@ private fun compactDateTime(time: Long): String =
     SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(time)) + " · " +
         java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(Date(time))
 
-/** "Saturday, November 21, 2026" */
+/** "Sat, Nov 21, 2026" */
 private fun fullDate(time: Long): String =
-    java.text.DateFormat.getDateInstance(java.text.DateFormat.FULL).format(Date(time))
+    SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()).format(Date(time))
 
 /** "1:56:23 PM" */
 private fun fullTime(time: Long): String =
