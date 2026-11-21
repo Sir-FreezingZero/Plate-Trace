@@ -54,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.HorizontalDivider
 import com.example.platescanner.R
 import androidx.compose.ui.res.painterResource
 import com.example.platescanner.data.WatchEntity
@@ -248,6 +249,8 @@ private fun PlateTimeline(
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
         }
+        // Full-width line under the header.
+        HorizontalDivider(Modifier.fillMaxWidth().padding(top = 4.dp), color = LineColor)
 
         if (adding) {
             AddWatchDialog(
