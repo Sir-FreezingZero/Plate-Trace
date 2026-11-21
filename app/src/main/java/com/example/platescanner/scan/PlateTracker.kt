@@ -21,7 +21,8 @@ import kotlin.math.sqrt
  *   if it stays in view, provided it has at least [minReads] reads (one-off reads are noise).
  * - The saved text is a per-character vote: each read votes with its character confidence,
  *   weighted towards larger (closer, sharper) views of the plate.
- * - The saved images are from the largest view of the plate.
+ * - The saved photo is the largest (clearest) crop whose own reading is exactly the saved text,
+ *   so the photo always shows what was read.
  * - After saving, further reads just keep the plate "in view". It can be saved again once it
  *   hasn't been seen for [cooldownMs] (Settings).
  *
@@ -51,9 +52,8 @@ class PlateTracker(
         val firstAt = now
         var lastAt = now
         val reads = ArrayList<Read>()
-        var bestWidth = 0
-        var bestRead: Read? = null
-        var bestVehicle: Bitmap? = null
+        /** For each distinct text read: its largest crop and the car shot from that frame. */
+        val bestByText = HashMap<String, Pair<Read, Bitmap>>()
         var committed = false
         val lastTexts = ArrayList<String>()
         var lastBox = Rect()
@@ -85,10 +85,9 @@ class PlateTracker(
             if (track.committed) continue // already saved; just keep it "in view"
             track.reads.add(r)
             if (track.reads.size > MAX_READS) track.reads.removeAt(0)
-            if (r.box.width() > track.bestWidth) {
-                track.bestWidth = r.box.width()
-                track.bestRead = r
-                track.bestVehicle = vehicleFor(r.box)
+            val current = track.bestByText[r.text]
+            if (current == null || r.box.width() > current.first.box.width()) {
+                track.bestByText[r.text] = r to vehicleFor(r.box)
             }
         }
         return collect(now, force = false)
@@ -113,14 +112,16 @@ class PlateTracker(
                 if (force || now - t.lastAt >= settleMs) iterator.remove()
                 continue
             }
-            val best = t.bestRead ?: continue
-            val text = vote(t.reads)
-            val plate = (if (text.isNotEmpty()) PlateTextFilter.accept(text) else null) ?: best.text
-            out.add(Result(plate, best.rawText, best.crop, t.bestVehicle ?: best.crop))
+            val largest = t.bestByText.values.maxByOrNull { it.first.box.width() } ?: continue
+            val voted = vote(t.reads)
+            val plate = (if (voted.isNotEmpty()) PlateTextFilter.accept(voted) else null)
+                ?: largest.first.text
+            // Prefer a photo that itself reads as the saved text.
+            val (read, vehicle) = t.bestByText[plate] ?: largest
+            out.add(Result(plate, read.rawText, read.crop, vehicle))
             t.committed = true
             t.reads.clear() // free bitmaps; from here on the track only keeps the plate "in view"
-            t.bestRead = null
-            t.bestVehicle = null
+            t.bestByText.clear()
         }
         return out
     }
