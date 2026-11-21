@@ -238,10 +238,10 @@ fun SettingsPage(
                 )
                 SliderRow(
                     title = "Photo interval",
-                    description = "Time between photos in photo mode.",
+                    description = "Time between photos in photo mode. Short intervals are limited by how fast the phone takes and reads each photo.",
                     value = photoInterval / 1000f,
-                    range = 0.5f..3f,
-                    step = 0.5f,
+                    range = 0.1f..3f,
+                    step = 0.1f,
                     unit = "s",
                     decimals = 1,
                     enabled = photos,
