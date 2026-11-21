@@ -12,8 +12,13 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executor
 
-/** A confirmed plate with its cropped image. */
-class PlateDetection(val plate: String, val rawText: String, val crop: Bitmap)
+/** A confirmed plate with a tight plate crop and a wider crop of the back of the vehicle. */
+class PlateDetection(
+    val plate: String,
+    val rawText: String,
+    val crop: Bitmap,
+    val vehicle: Bitmap,
+)
 
 /**
  * CameraX analyzer: runs on-device OCR on each frame, picks out plate-like text, and when a
@@ -72,7 +77,7 @@ class PlateAnalyzer(
         // ML Kit boxes are in upright coordinates, so rotate the frame to match before cropping.
         val frame = imageProxy.toBitmap().rotated(rotation)
         for (c in confirmed) {
-            onPlate(PlateDetection(c.plate, c.rawText, frame.cropAround(c.box)))
+            onPlate(PlateDetection(c.plate, c.rawText, frame.cropAround(c.box), frame.cropVehicle(c.box)))
         }
     }
 
@@ -86,7 +91,9 @@ class PlateAnalyzer(
             val detections = try {
                 if (task.isSuccessful) {
                     PlateTextFilter.extract(task.result).map {
-                        PlateDetection(it.plate, it.rawText, bitmap.cropAround(it.box))
+                        PlateDetection(
+                            it.plate, it.rawText, bitmap.cropAround(it.box), bitmap.cropVehicle(it.box)
+                        )
                     }
                 } else {
                     Log.w(TAG, "Text recognition failed", task.exception)

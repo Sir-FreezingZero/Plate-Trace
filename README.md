@@ -30,7 +30,7 @@ When a plate is saved its number flashes at the top (green = new plate, dark = s
 | Camera frames (1080p) → ML Kit text recognition | `scan/PlateAnalyzer.kt` |
 | Keep text that looks like a plate (4–8 letters/digits, has a digit, wide box) | `scan/PlateTextFilter.kt` |
 | Require the same reading in 2 frames; don't re-record while it stays in view; record a new sighting after 15 s out of view | `scan/PlateTracker.kt` |
-| Crop the plate (text box + margin), save JPEG + Room row | `data/PlateRepository.kt`, `data/PlateDao.kt` |
+| Crop the plate (text box + margin) and a wider shot of the back of the car, save JPEGs + Room row | `data/PlateRepository.kt`, `data/PlateDao.kt` |
 
 Images are stored in the app's private storage (`files/plate_crops/`); the database is `plates.db`.
 
@@ -40,12 +40,14 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
   phone numbers on vans or shop signs.
 - **Strictness / repeat timing:** constructor values in `PlateTracker.kt`
   (`confirmFrames`, `confirmWindowMs`, `cooldownMs`).
-- **Crop margin:** `padX` / `padY` in `cropAround()` in `PlateAnalyzer.kt`.
+- **Crop margin:** `padX` / `padY` in `cropAround()` in `scan/BitmapUtils.kt`.
+- **Vehicle shot size:** the `5.5f` (car width ÷ plate-text width) and `0.8f` (height ÷ width) in `cropVehicle()` in the same file.
 
 ## Limitations
 - This uses general-purpose OCR with plate rules, not a dedicated plate-detection model.
   It works well at close-to-medium range in daylight; expect misses at long range, at night,
   on motion blur, and on stylised or two-line plates. For higher accuracy, swap in a
   TFLite plate detector before the OCR step in `PlateAnalyzer`.
+- The car shot is estimated from where the plate is (there is no vehicle detector), so very close or very far cars may be framed loosely.
 - Similar characters (O/0, I/1, B/8) can occasionally produce two entries for one plate.
 - Check local laws before recording plates of other people's vehicles.

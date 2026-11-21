@@ -18,6 +18,8 @@ data class PlateEntity(
     val sightingCount: Int,
     /** Absolute path of the most recent cropped image, used as the list thumbnail. */
     val latestImagePath: String,
+    /** Wider shot of the back of the car from the latest sighting (null for older data). */
+    val latestVehicleImagePath: String? = null,
 )
 
 /** One row per time a plate was seen; each has its own cropped image. */
@@ -38,6 +40,8 @@ data class SightingEntity(
     val plateId: Long,
     val timestamp: Long,
     val imagePath: String,
+    /** Wider crop showing the back of the vehicle (null for sightings saved before v2). */
+    val vehicleImagePath: String? = null,
     /** Text exactly as the recogniser read it, before normalisation (e.g. "ABC-1234"). */
     val rawText: String,
 )

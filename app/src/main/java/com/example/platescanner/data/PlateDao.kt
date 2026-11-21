@@ -25,6 +25,9 @@ abstract class PlateDao {
     @Query("SELECT imagePath FROM sightings WHERE plateId = :plateId")
     abstract suspend fun imagePathsFor(plateId: Long): List<String>
 
+    @Query("SELECT vehicleImagePath FROM sightings WHERE plateId = :plateId AND vehicleImagePath IS NOT NULL")
+    abstract suspend fun vehicleImagePathsFor(plateId: Long): List<String>
+
     @Insert
     abstract suspend fun insertPlate(plate: PlateEntity): Long
 
@@ -50,6 +53,7 @@ abstract class PlateDao {
         rawText: String,
         timestamp: Long,
         imagePath: String,
+        vehicleImagePath: String?,
     ): Boolean {
         val existing = findByNumber(number)
         val plateId: Long
@@ -62,6 +66,7 @@ abstract class PlateDao {
                     lastSeen = timestamp,
                     sightingCount = 1,
                     latestImagePath = imagePath,
+                    latestVehicleImagePath = vehicleImagePath,
                 )
             )
             isNew = true
@@ -71,6 +76,7 @@ abstract class PlateDao {
                     lastSeen = timestamp,
                     sightingCount = existing.sightingCount + 1,
                     latestImagePath = imagePath,
+                    latestVehicleImagePath = vehicleImagePath,
                 )
             )
             plateId = existing.id
@@ -81,6 +87,7 @@ abstract class PlateDao {
                 plateId = plateId,
                 timestamp = timestamp,
                 imagePath = imagePath,
+                vehicleImagePath = vehicleImagePath,
                 rawText = rawText,
             )
         )

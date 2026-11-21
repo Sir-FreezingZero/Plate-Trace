@@ -92,7 +92,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             for (d in detections) {
                 try {
-                    val isNew = repository.save(d.plate, d.rawText, d.crop)
+                    val isNew = repository.save(d.plate, d.rawText, d.crop, d.vehicle)
                     val kind = if (isNew) Notice.Kind.NEW_PLATE else Notice.Kind.REPEAT_PLATE
                     _notices.tryEmit(Notice(d.plate, kind))
                 } catch (t: Throwable) {
