@@ -36,6 +36,12 @@ internal val PageColor = Color(0xFF0E0F11)
 internal val LineColor = Color.White.copy(alpha = 0.14f)
 internal val FieldColor = Color.White.copy(alpha = 0.06f)
 
+/** Grouped panels (settings sections, plate lists): a step lighter than the page. */
+internal val PanelBg = Color(0xFF1A1C20)
+
+/** Fine line between rows inside a panel. */
+internal val RowLine = Color.White.copy(alpha = 0.07f)
+
 /**
  * A full-screen page that fades in over the camera. The camera stays composed underneath,
  * so recording keeps running while a page is open.

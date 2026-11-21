@@ -29,6 +29,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.layout.Layout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -80,7 +82,7 @@ private val FormatPresets = listOf(
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
 )
 
-private val RowPadding = Modifier.padding(horizontal = 20.dp)
+private val RowPadding = Modifier.padding(horizontal = 14.dp)
 
 /** Full-screen settings page; recording keeps running underneath. */
 @Composable
@@ -326,23 +328,57 @@ fun SettingsPage(
 // Building blocks
 // ---------------------------------------------------------------------------------------------
 
-/** Header with an underline that stops just short of the screen edges, then its rows. */
+/** Section label, then its rows in a rounded panel with fine lines between them. */
 @Composable
-private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
         Text(
             title.uppercase(),
             color = Muted,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
-            modifier = RowPadding,
+            modifier = Modifier.padding(start = 26.dp, end = 26.dp, bottom = 6.dp),
         )
-        HorizontalDivider(
-            Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
-            color = LineColor,
-        )
-        content()
+        Box(
+            Modifier
+                .padding(horizontal = 12.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PanelBg),
+        ) {
+            DividedColumn(content)
+        }
+    }
+}
+
+/** Stacks its children and draws a fine line between each pair (inset from the sides). */
+@Composable
+private fun DividedColumn(content: @Composable () -> Unit) {
+    val lineYs = remember { ArrayList<Int>() }
+    Layout(
+        content = content,
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawWithContent {
+                drawContent()
+                val inset = 14.dp.toPx()
+                for (y in lineYs) {
+                    drawLine(RowLine, Offset(inset, y.toFloat()), Offset(size.width - inset, y.toFloat()), 1f)
+                }
+            },
+    ) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0)) }
+        val height = placeables.sumOf { it.height }
+        layout(constraints.maxWidth, height) {
+            lineYs.clear()
+            var y = 0
+            placeables.forEachIndexed { i, p ->
+                if (i > 0 && p.height > 0) lineYs.add(y)
+                p.place(0, y)
+                y += p.height
+            }
+        }
     }
 }
 
