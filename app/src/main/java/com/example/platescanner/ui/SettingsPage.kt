@@ -63,14 +63,18 @@ import com.example.platescanner.scan.FormatMode
 import com.example.platescanner.scan.PlateTextFilter
 import kotlin.math.roundToInt
 
-/** Preset formats: mask (L = letter, 0 = digit), example, where it's used. */
-private data class FormatPreset(val mask: String, val example: String, val note: String)
+/**
+ * Preset formats: one or more masks (L = letter, 0 = digit), example(s), where it's used.
+ * A preset with several masks is one switch that turns them all on or off.
+ */
+private data class FormatPreset(val masks: List<String>, val example: String, val note: String) {
+    constructor(mask: String, example: String, note: String) : this(listOf(mask), example, note)
+}
 
 private val FormatPresets = listOf(
     FormatPreset("LLL0000", "ABC 1234", "NY, PA, TX and many others"),
     FormatPreset("0LLL000", "1ABC234", "California"),
-    FormatPreset("L00LLL", "A12 BCD", "New Jersey"),
-    FormatPreset("LLL00L", "ABC 12D", "Older New Jersey"),
+    FormatPreset(listOf("L00LLL", "LLL00L"), "A12 BCD · ABC 12D", "New Jersey (current and older)"),
     FormatPreset("LLL000", "ABC 123", "3 letters, 3 numbers"),
     FormatPreset("000LLL", "123 ABC", "3 numbers, 3 letters"),
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
@@ -206,12 +210,12 @@ fun SettingsPage(
                         title = preset.example,
                         description = preset.note,
                         monospaceTitle = true,
-                        checked = preset.mask in rules.masks,
+                        checked = preset.masks.all { it in rules.masks },
                         enabled = specific,
-                        onChange = { viewModel.setMaskEnabled(preset.mask, it) },
+                        onChange = { on -> preset.masks.forEach { viewModel.setMaskEnabled(it, on) } },
                     )
                 }
-                val presetMasks = FormatPresets.map { it.mask }.toSet()
+                val presetMasks = FormatPresets.flatMap { it.masks }.toSet()
                 rules.masks.filter { it !in presetMasks }.forEach { mask ->
                     ToggleRow(
                         title = mask,
