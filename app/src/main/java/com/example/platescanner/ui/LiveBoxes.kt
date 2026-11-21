@@ -53,8 +53,8 @@ private fun LiveBox.color(): Color = when {
 }
 
 /**
- * Settings → Show live readings: viewfinder brackets around each detected plate with a small
- * label showing the reading and its progress towards being saved.
+ * Settings → Show live readings: a thin box around each detected plate with a small tag
+ * showing the reading and its progress towards being saved.
  *
  * Frame → screen mapping matches PreviewView's FILL_CENTER (scale the upright analysis frame to
  * cover the view, centred); preview and analysis share a 16:9 aspect so they show the same
@@ -69,7 +69,7 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
         val scale = max(viewW / info.width, viewH / info.height)
         val offX = (viewW - info.width * scale) / 2f
         val offY = (viewH - info.height * scale) / 2f
-        val padPx = with(LocalDensity.current) { 5.dp.toPx() }
+        val padPx = with(LocalDensity.current) { 2.dp.toPx() }
 
         info.boxes.forEachIndexed { i, b ->
             key(b.savedText ?: b.text ?: "box$i") {
@@ -79,7 +79,7 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
                     offX + b.box.right * scale + padPx,
                     offY + b.box.bottom * scale + padPx,
                 )
-                val rect by animateRectAsState(target, tween(220), label = "plateBox")
+                val rect by animateRectAsState(target, tween(150), label = "plateBox")
                 PlateMarker(b, rect, viewW)
             }
         }
@@ -91,106 +91,46 @@ private fun PlateMarker(b: LiveBox, r: Rect, viewW: Float) {
     val density = LocalDensity.current
     val color = b.color()
 
-    // Corner brackets with a faint tint inside.
+    // Plain thin rectangle.
     Canvas(
         Modifier
             .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
             .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
     ) {
-        val w = size.width
-        val h = size.height
-        val len = (min(w, h) * 0.38f).coerceIn(6.dp.toPx(), 16.dp.toPx())
-        drawRoundRect(color.copy(alpha = 0.10f), cornerRadius = CornerRadius(4.dp.toPx()))
-        val corners = Path().apply {
-            moveTo(0f, len); lineTo(0f, 0f); lineTo(len, 0f)
-            moveTo(w - len, 0f); lineTo(w, 0f); lineTo(w, len)
-            moveTo(w, h - len); lineTo(w, h); lineTo(w - len, h)
-            moveTo(len, h); lineTo(0f, h); lineTo(0f, h - len)
-        }
-        drawPath(
-            corners, color,
-            style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-        )
+        drawRect(color, style = Stroke(1.5.dp.toPx()))
     }
 
-    // Label centred above the box, kept on screen.
-    val gap = with(density) { 6.dp.roundToPx() }
+    // Tag attached to the box's top-left corner, kept on screen.
     Box(
         Modifier.layout { measurable, _ ->
             val p = measurable.measure(Constraints())
             layout(0, 0) {
-                val x = (r.center.x - p.width / 2f).roundToInt()
-                    .coerceIn(0, max(0, viewW.roundToInt() - p.width))
-                val y = (r.top.roundToInt() - p.height - gap).coerceAtLeast(0)
+                val x = r.left.roundToInt().coerceIn(0, max(0, viewW.roundToInt() - p.width))
+                val y = (r.top.roundToInt() - p.height).coerceAtLeast(0)
                 p.place(x, y)
             }
         }
     ) {
-        PlateLabel(b, color)
+        Text(
+            tagText(b),
+            color = Color.Black,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp,
+            maxLines = 1,
+            modifier = Modifier
+                .background(color)
+                .padding(horizontal = 4.dp, vertical = 1.dp),
+        )
     }
 }
 
-@Composable
-private fun PlateLabel(b: LiveBox, color: Color) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(LabelGlass)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        when {
-            b.saved -> {
-                Text("✓", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(5.dp))
-                PlateText(b.savedText ?: b.text ?: "", Color.White)
-                Spacer(Modifier.width(6.dp))
-                Text("Saved", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            }
-            b.accepted -> {
-                PlateText(b.text ?: "", Color.White)
-                Spacer(Modifier.width(8.dp))
-                ProgressDots(done = b.matches, total = b.needed)
-            }
-            else -> {
-                PlateText(b.text ?: "· · ·", color)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    if (b.reason == "format") "not a plate format" else "unsure",
-                    color = color.copy(alpha = 0.85f),
-                    fontSize = 11.sp,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlateText(text: String, color: Color) {
-    Text(
-        text,
-        color = color,
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
-        fontSize = 14.sp,
-        letterSpacing = 0.5.sp,
-        maxLines = 1,
-    )
-}
-
-/** One dot per matching reading needed to save; filled as they come in. */
-@Composable
-private fun ProgressDots(done: Int, total: Int) {
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        repeat(total.coerceAtLeast(1)) { i ->
-            Box(
-                Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(if (i < done) Accent else Color.White.copy(alpha = 0.3f))
-            )
-        }
-    }
+/** e.g. "LXC15M 2/3", "LXC15M ✓", "LXC1SM ?" (unsure), "SALE50 ✕" (not a plate format). */
+private fun tagText(b: LiveBox): String = when {
+    b.saved -> "${b.savedText ?: b.text} ✓"
+    b.accepted -> "${b.text} ${b.matches}/${b.needed}"
+    b.reason == "format" -> "${b.text ?: "?"} ✕"
+    else -> "${b.text ?: ""} ?".trim()
 }
 
 /** Small stats line shown under the recording timer when live readings are on. */
@@ -200,12 +140,11 @@ fun LiveStats(info: FrameInfo, modifier: Modifier = Modifier) {
     Text(
         "%dp · %.1f fps".format(min(info.width, info.height), fps),
         color = Color.White.copy(alpha = 0.75f),
-        fontSize = 11.sp,
+        fontSize = 10.sp,
         fontFamily = FontFamily.Monospace,
         modifier = modifier
-            .padding(top = 6.dp)
-            .clip(RoundedCornerShape(50))
+            .padding(top = 4.dp)
             .background(LabelGlass)
-            .padding(horizontal = 10.dp, vertical = 3.dp),
+            .padding(horizontal = 6.dp, vertical = 1.dp),
     )
 }

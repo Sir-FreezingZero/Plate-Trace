@@ -44,7 +44,7 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Plate format:** *US plates* (default: needs letters and numbers, so phone numbers are ignored), *Only specific formats* (tick formats such as ABC 1234 or 1ABC234, or add your own with L = letter, 0 = number, * = either; look-alike characters like 0/O and 8/B are corrected to fit), or *Any plate-like text*.
 - **Matching readings to save:** 2–5 frames must read exactly the same text before a plate is saved (default 3).
 - **Save the same plate again after:** how long a plate must be out of view before it's saved again.
-- **Show live readings:** while recording, draws viewfinder brackets around every plate the detector finds, labelled with the reading: white with progress dots while it collects matching readings, green with ✓ once saved, amber when rejected (unsure, or not matching the plate format). Also shows the analysis resolution and frames per second. Useful for checking why a plate is misread.
+- **Show live readings:** while recording, draws a thin box around every plate the detector finds with a small tag: white `LXC15M 2/3` while collecting matching readings, green `LXC15M ✓` once saved, amber `?` (unsure) or `✕` (not a plate format) when rejected. Also shows the analysis resolution and frames per second. Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 
 ### Watch list
