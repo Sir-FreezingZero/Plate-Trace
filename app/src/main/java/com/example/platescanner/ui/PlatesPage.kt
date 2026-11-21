@@ -1026,8 +1026,25 @@ private fun PlateDetail(
                 }
             }
 
-            sightings.firstOrNull { it.latitude != null }?.let { last ->
-                item(key = "location") {
+            val last = sightings.firstOrNull { it.latitude != null }
+            item(key = "location") {
+                if (last == null) {
+                    Column(Modifier.padding(bottom = 12.dp)) {
+                        Text(
+                            "LAST LOCATION",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                        Text(
+                            "Not recorded yet. New sightings save it while recording with location on.",
+                            color = Muted,
+                            fontSize = 12.sp,
+                        )
+                    }
+                } else {
                     Column(Modifier.padding(bottom = 12.dp)) {
                         Text(
                             "LAST LOCATION",

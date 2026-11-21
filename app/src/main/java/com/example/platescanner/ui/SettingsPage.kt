@@ -131,7 +131,8 @@ fun SettingsPage(
                 )
                 ToggleRow(
                     title = "Save location",
-                    description = "Latitude/longitude with each sighting, plus road, city and state when online.",
+                    description = "Coordinates with each sighting; road, city, state when online. " +
+                        if (saveLocation) "Now: ${remember(visible) { viewModel.locationTracker.statusText() }}" else "",
                     checked = saveLocation,
                     onChange = viewModel::setSaveLocation,
                 )

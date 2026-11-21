@@ -8,6 +8,7 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
@@ -44,11 +45,25 @@ class LocationTracker(context: Context) {
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
 
+    /** GPS, network, and on Android 12+ the "fused" provider (works indoors via Wi-Fi). */
+    private fun providers(): List<String> {
+        val all = manager?.allProviders ?: return emptyList()
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= 31) add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+        }
+        return wanted.filter { it in all }
+    }
+
+    private fun anyProviderEnabled(): Boolean =
+        providers().any { runCatching { manager?.isProviderEnabled(it) == true }.getOrDefault(false) }
+
     @SuppressLint("MissingPermission") // checked by hasPermission()
     fun start() {
         if (running || manager == null || !hasPermission()) return
         running = true
-        for (provider in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
+        for (provider in providers()) {
             try {
                 if (!manager.isProviderEnabled(provider)) continue
                 manager.getLastKnownLocation(provider)?.let { offer(it) }
@@ -69,11 +84,31 @@ class LocationTracker(context: Context) {
         }
     }
 
-    /** The latest position if it's no older than [maxAgeMs], else null. */
-    fun current(maxAgeMs: Long = 60_000): Location? {
-        val loc = latest ?: return null
-        val ageMs = (SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000
-        return if (ageMs <= maxAgeMs) loc else null
+    /**
+     * The latest position if it's no older than [maxAgeMs]; otherwise the best last-known
+     * position from any provider within that age; else null.
+     */
+    @SuppressLint("MissingPermission")
+    fun current(maxAgeMs: Long = 5 * 60_000L): Location? {
+        latest?.takeIf { ageMs(it) <= maxAgeMs }?.let { return it }
+        if (!hasPermission() || manager == null) return null
+        return providers()
+            .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
+            .filter { ageMs(it) <= maxAgeMs }
+            .maxByOrNull { it.elapsedRealtimeNanos }
+            ?.also { offer(it) }
+    }
+
+    private fun ageMs(loc: Location) =
+        (SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000
+
+    /** Short human status for Settings, e.g. "±12 m", "Searching…", "No permission". */
+    fun statusText(): String = when {
+        !hasPermission() -> "No location permission"
+        !anyProviderEnabled() -> "Location is turned off in Android"
+        else -> current()?.let { loc ->
+            if (loc.hasAccuracy()) "Working · ±${loc.accuracy.toInt()} m" else "Working"
+        } ?: if (running) "Searching…" else "Ready (starts when recording)"
     }
 
     /** Keep a newer fix, or a more accurate one from about the same time. */
