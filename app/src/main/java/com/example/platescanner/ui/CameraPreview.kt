@@ -90,6 +90,9 @@ fun CameraPreview(
                             .build()
                     )
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    // RGBA frames convert to a bitmap with a plain copy (YUV needs a conversion),
+                    // which takes time off every frame.
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
                     .also { it.setAnalyzer(analysisExecutor, analyzer) }
 

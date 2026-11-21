@@ -44,6 +44,8 @@ class FrameInfo(
     val boxes: List<LiveBox>,
     /** Location available when this image was taken, e.g. "±12 m", or "no location". */
     val locationText: String? = null,
+    /** SystemClock.elapsedRealtime() when the image arrived, so the live view can predict motion. */
+    val capturedAt: Long = 0,
 )
 
 /**
@@ -146,6 +148,7 @@ class PlateAnalyzer(
             imageProxy.close()
             return
         }
+        val arrivedAt = SystemClock.elapsedRealtime()
         // Stamp the location now, at capture time, so it travels with the plate to saving.
         val capturedAt = try { locationProvider?.invoke() } catch (t: Throwable) { null }
         val frame = try {
@@ -159,7 +162,6 @@ class PlateAnalyzer(
         if (frame == null) return
 
         try {
-            val start = SystemClock.elapsedRealtime()
             val listener = onFrameInfo
             val live = if (listener != null) ArrayList<LiveBox>() else null
             val reads = findAndRead(frame, live, capturedAt)
@@ -180,7 +182,7 @@ class PlateAnalyzer(
                     capturedAt.hasAccuracy() -> "±${capturedAt.accuracy.toInt()} m"
                     else -> "location ok"
                 }
-                listener(FrameInfo(frame.width, frame.height, now - start, withStatus, locText))
+                listener(FrameInfo(frame.width, frame.height, now - arrivedAt, withStatus, locText, arrivedAt))
             }
         } catch (t: Throwable) {
             Log.e(TAG, "Plate processing failed", t)
