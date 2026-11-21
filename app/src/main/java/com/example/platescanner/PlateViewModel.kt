@@ -86,6 +86,12 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _agreeReads = MutableStateFlow(prefs.getInt(KEY_AGREE_READS, 3))
     val agreeReads: StateFlow<Int> = _agreeReads.asStateFlow()
 
+    private val _autoDelete = MutableStateFlow(prefs.getBoolean(KEY_AUTO_DELETE, false))
+    val autoDelete: StateFlow<Boolean> = _autoDelete.asStateFlow()
+
+    private val _autoDeleteDays = MutableStateFlow(prefs.getInt(KEY_AUTO_DELETE_DAYS, 30))
+    val autoDeleteDays: StateFlow<Int> = _autoDeleteDays.asStateFlow()
+
     /** Percent, 5–95. */
     private val _detectThreshold = MutableStateFlow(prefs.getInt(KEY_DETECT_THRESHOLD, 40))
     val detectThreshold: StateFlow<Int> = _detectThreshold.asStateFlow()
@@ -115,6 +121,41 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         applyCapture()
         analyzer.detectThreshold = _detectThreshold.value / 100f
         analyzer.minCharConfidence = _readThreshold.value / 100f
+
+        // Auto-delete: run now, then every 30 minutes while the app is open.
+        viewModelScope.launch {
+            while (true) {
+                purgeOldPlates()
+                kotlinx.coroutines.delay(30 * 60_000L)
+            }
+        }
+    }
+
+    fun setAutoDelete(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_DELETE, enabled).apply()
+        _autoDelete.value = enabled
+        viewModelScope.launch { purgeOldPlates() }
+    }
+
+    fun setAutoDeleteDays(days: Int) {
+        prefs.edit().putInt(KEY_AUTO_DELETE_DAYS, days).apply()
+        _autoDeleteDays.value = days
+        viewModelScope.launch { purgeOldPlates() }
+    }
+
+    /** Deletes plates not seen for the set number of days, except watched or starred ones. */
+    private suspend fun purgeOldPlates() {
+        if (!_autoDelete.value) return
+        val cutoff = System.currentTimeMillis() - _autoDeleteDays.value * 24L * 60 * 60 * 1000
+        try {
+            repository.deleteOlderThan(cutoff)
+        } catch (t: Throwable) {
+            Log.e("PlateViewModel", "Auto-delete failed", t)
+        }
+    }
+
+    fun setStarred(plateId: Long, starred: Boolean) {
+        viewModelScope.launch { repository.setStarred(plateId, starred) }
     }
 
     fun setDetectThreshold(percent: Int) {
@@ -316,6 +357,8 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_SHOW_LIVE = "show_live_readings"
         const val KEY_AGREE_READS = "agree_reads"
         const val KEY_CAPTURE_MODE = "capture_mode"
+        const val KEY_AUTO_DELETE = "auto_delete"
+        const val KEY_AUTO_DELETE_DAYS = "auto_delete_days"
         const val KEY_DETECT_THRESHOLD = "detect_threshold_pct"
         const val KEY_READ_THRESHOLD = "read_threshold_pct"
         const val KEY_PHOTO_INTERVAL = "photo_interval_ms"

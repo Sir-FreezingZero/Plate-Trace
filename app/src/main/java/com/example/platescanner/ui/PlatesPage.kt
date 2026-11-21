@@ -54,6 +54,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import com.example.platescanner.R
 import androidx.compose.ui.res.painterResource
@@ -140,6 +142,8 @@ fun PlatesPage(
         }
     }
 
+    val toggleStar: (PlateEntity) -> Unit = { plate -> viewModel.setStarred(plate.id, !plate.starred) }
+
     val toggleWatch: (PlateEntity) -> Unit = { plate ->
         val turningOn = !plate.watched
         if (turningOn && Build.VERSION.SDK_INT >= 33 && !WatchAlerts.canNotify(context)) {
@@ -168,6 +172,7 @@ fun PlatesPage(
                     recordingSince = recordingSince,
                     onSelect = { selectedId = it.id },
                     onToggleWatch = toggleWatch,
+                    onToggleStar = toggleStar,
                     onBack = onClose,
                 )
             } else {
@@ -177,6 +182,7 @@ fun PlatesPage(
                     recordingSince = recordingSince,
                     viewModel = viewModel,
                     onToggleWatch = toggleWatch,
+                    onToggleStar = toggleStar,
                     onBack = { selectedId = null },
                 )
             }
@@ -201,6 +207,7 @@ private fun PlateTimeline(
     recordingSince: Long,
     onSelect: (PlateEntity) -> Unit,
     onToggleWatch: (PlateEntity) -> Unit,
+    onToggleStar: (PlateEntity) -> Unit,
     onBack: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -344,6 +351,7 @@ private fun PlateTimeline(
                             lineBelow = below,
                             onClick = { onSelect(e.plate) },
                             onToggleWatch = { onToggleWatch(e.plate) },
+                            onToggleStar = { onToggleStar(e.plate) },
                         )
                     }
                 }
@@ -405,6 +413,7 @@ private fun PlateRow(
     lineBelow: Boolean,
     onClick: () -> Unit,
     onToggleWatch: () -> Unit,
+    onToggleStar: () -> Unit,
 ) {
     Row(
         Modifier
@@ -449,6 +458,7 @@ private fun PlateRow(
                 maxLines = 1,
             )
         }
+        StarButton(starred = plate.starred, onClick = onToggleStar)
         WatchButton(watched = plate.watched, onClick = onToggleWatch)
         Icon(
             Icons.Filled.KeyboardArrowRight,
@@ -557,6 +567,19 @@ private fun AddWatchDialog(onAdd: (String) -> Boolean, onDismiss: () -> Unit) {
     )
 }
 
+/** Star: keeps the plate (never auto-deleted). Filled white when starred. */
+@Composable
+private fun StarButton(starred: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(
+            if (starred) rememberVectorPainter(Icons.Filled.Star) else painterResource(R.drawable.ic_star_outline),
+            contentDescription = if (starred) "Unstar" else "Star (keep)",
+            tint = if (starred) Color.White else Muted.copy(alpha = 0.45f),
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
 /** Bell: filled amber when the plate is on the watch list. */
 @Composable
 private fun WatchButton(watched: Boolean, onClick: () -> Unit) {
@@ -645,6 +668,7 @@ private fun PlateDetail(
     recordingSince: Long,
     viewModel: PlateViewModel,
     onToggleWatch: (PlateEntity) -> Unit,
+    onToggleStar: (PlateEntity) -> Unit,
     onBack: () -> Unit,
 ) {
     val plateFlow = remember(plateId) { viewModel.plate(plateId) }
@@ -672,6 +696,7 @@ private fun PlateDetail(
                 plate?.let { PlateBadge(it.plateNumber, fontSize = 18.sp) }
             }
             if (recording) RecordingIndicator(recordingSince)
+            plate?.let { p -> StarButton(starred = p.starred, onClick = { onToggleStar(p) }) }
             plate?.let { p -> WatchButton(watched = p.watched, onClick = { onToggleWatch(p) }) }
             IconButton(onClick = { confirmDelete = true }) {
                 Icon(Icons.Filled.Delete, contentDescription = "Delete plate", tint = Muted)

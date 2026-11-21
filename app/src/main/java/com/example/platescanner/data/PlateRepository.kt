@@ -62,6 +62,17 @@ class PlateRepository(context: Context) {
         dao.setWatched(plateId, watched)
     }
 
+    suspend fun setStarred(plateId: Long, starred: Boolean) = withContext(Dispatchers.IO) {
+        dao.setStarred(plateId, starred)
+    }
+
+    /** Deletes plates (and their images) not seen since [cutoff], except watched or starred. */
+    suspend fun deleteOlderThan(cutoff: Long): Int = withContext(Dispatchers.IO) {
+        val ids = dao.expiredPlateIds(cutoff)
+        ids.forEach { delete(it) }
+        ids.size
+    }
+
     suspend fun deleteAll() = withContext(Dispatchers.IO) {
         dao.deleteEverything()
         imageDir.listFiles()?.forEach { it.delete() }

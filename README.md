@@ -20,7 +20,7 @@ The whole screen is the camera, with one row of controls along the bottom:
 | Big round button (centre) | Tap to start / stop recording (a red timer shows at the top). The icon shows the mode: video camera or photo camera. **Press and hold** to switch between video and photo mode |
 | Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
 | Other bar buttons | Spare, not used yet |
-| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen, or only watched plates), with search. Tap a bell to watch a plate. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
+| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen, or only watched plates), with search. Tap a bell to watch a plate, or the star to keep it from being auto-deleted. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
 
 When a plate is saved its number flashes at the top (green = new plate, dark = seen before) and the ☰ button pulses.
 
@@ -46,6 +46,7 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Read plates from:** *Video* (live 1080p feed, several images a second; default) or *Photos* (a full-resolution photo every 0.5–3 s; sharper and reads further on many phones, but fewer images, so fast-passing cars may be missed). In photo mode a single clear read is enough to save a car that only appears in one photo.
 - **Matching readings to save:** 2–5 frames must read exactly the same text before a plate is saved (default 3).
 - **Save the same plate again after:** how long a plate must be out of view before it's saved again.
+- **Auto-delete old plates:** when on, plates not seen for the set number of days (1–90) are deleted with their images, checked at startup and every 30 minutes. Plates with an alert (bell) or a star are always kept.
 - **Show live readings:** while recording, draws a box around every plate the detector finds, with a strip on top showing the plate number read in that frame and a strip underneath showing status only: `2/3` (matching readings), `saved`, `unsure`, or `—` (not a plate format). White while reading, green once saved, amber when rejected. Also shows the image size being read and how long each one takes. Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 

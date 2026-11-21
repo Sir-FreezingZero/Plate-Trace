@@ -24,6 +24,9 @@ data class PlateEntity(
     /** On the watch list: alert when this plate is seen. */
     @ColumnInfo(defaultValue = "0")
     val watched: Boolean = false,
+    /** Starred: kept forever (never auto-deleted). */
+    @ColumnInfo(defaultValue = "0")
+    val starred: Boolean = false,
 )
 
 /** One row per time a plate was seen; each has its own cropped image. */

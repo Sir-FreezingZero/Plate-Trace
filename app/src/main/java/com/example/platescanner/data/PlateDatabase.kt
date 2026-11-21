@@ -9,13 +9,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [PlateEntity::class, SightingEntity::class, WatchEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class PlateDatabase : RoomDatabase() {
     abstract fun plateDao(): PlateDao
 
     companion object {
+        /** v5: starred plates (kept by auto-delete). */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE plates ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         /** v4: watches for plates not seen yet. */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -49,7 +56,7 @@ abstract class PlateDatabase : RoomDatabase() {
                     context.applicationContext,
                     PlateDatabase::class.java,
                     "plates.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
             }
     }
 }

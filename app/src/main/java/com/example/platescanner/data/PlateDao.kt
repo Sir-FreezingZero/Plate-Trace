@@ -26,6 +26,13 @@ abstract class PlateDao {
     @Query("DELETE FROM watches WHERE plateNumber = :plateNumber")
     abstract suspend fun deleteWatch(plateNumber: String)
 
+    @Query("UPDATE plates SET starred = :starred WHERE id = :id")
+    abstract suspend fun setStarred(id: Long, starred: Boolean)
+
+    /** Plates not seen since [cutoff] that are neither watched nor starred. */
+    @Query("SELECT id FROM plates WHERE lastSeen < :cutoff AND watched = 0 AND starred = 0")
+    abstract suspend fun expiredPlateIds(cutoff: Long): List<Long>
+
     @Query("UPDATE plates SET watched = :watched WHERE id = :id")
     abstract suspend fun setWatched(id: Long, watched: Boolean)
 

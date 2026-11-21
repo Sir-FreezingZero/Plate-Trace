@@ -96,6 +96,8 @@ fun SettingsPage(
     val photoInterval by viewModel.photoIntervalMs.collectAsStateWithLifecycle()
     val detectThreshold by viewModel.detectThreshold.collectAsStateWithLifecycle()
     val readThreshold by viewModel.readThreshold.collectAsStateWithLifecycle()
+    val autoDelete by viewModel.autoDelete.collectAsStateWithLifecycle()
+    val autoDeleteDays by viewModel.autoDeleteDays.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
     val specific = rules.mode == FormatMode.SPECIFIC
@@ -252,6 +254,24 @@ fun SettingsPage(
             }
 
             Section("Storage") {
+                ToggleRow(
+                    title = "Auto-delete old plates",
+                    description = "Deletes plates not seen for longer than the time below. " +
+                        "Plates with an alert (bell) or a star are always kept.",
+                    checked = autoDelete,
+                    onChange = viewModel::setAutoDelete,
+                )
+                SliderRow(
+                    title = "Delete after",
+                    description = "Days since the plate was last seen.",
+                    value = autoDeleteDays.toFloat(),
+                    range = 1f..90f,
+                    step = 1f,
+                    unit = "d",
+                    decimals = 0,
+                    enabled = autoDelete,
+                    onChange = { viewModel.setAutoDeleteDays(it.roundToInt()) },
+                )
                 Row(
                     Modifier
                         .fillMaxWidth()
