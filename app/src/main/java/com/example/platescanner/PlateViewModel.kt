@@ -89,8 +89,12 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _autoDelete = MutableStateFlow(prefs.getBoolean(KEY_AUTO_DELETE, false))
     val autoDelete: StateFlow<Boolean> = _autoDelete.asStateFlow()
 
-    private val _autoDeleteDays = MutableStateFlow(prefs.getInt(KEY_AUTO_DELETE_DAYS, 30))
-    val autoDeleteDays: StateFlow<Int> = _autoDeleteDays.asStateFlow()
+    /** Hours since last seen before a plate is auto-deleted (older setting was in days). */
+    private val _autoDeleteHours = MutableStateFlow(
+        if (prefs.contains(KEY_AUTO_DELETE_HOURS)) prefs.getInt(KEY_AUTO_DELETE_HOURS, 720)
+        else prefs.getInt(KEY_AUTO_DELETE_DAYS, 30) * 24
+    )
+    val autoDeleteHours: StateFlow<Int> = _autoDeleteHours.asStateFlow()
 
     /** Percent, 5–95. */
     private val _detectThreshold = MutableStateFlow(prefs.getInt(KEY_DETECT_THRESHOLD, 40))
@@ -122,11 +126,11 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         analyzer.detectThreshold = _detectThreshold.value / 100f
         analyzer.minCharConfidence = _readThreshold.value / 100f
 
-        // Auto-delete: run now, then every 30 minutes while the app is open.
+        // Auto-delete: run now, then every 10 minutes while the app is open.
         viewModelScope.launch {
             while (true) {
                 purgeOldPlates()
-                kotlinx.coroutines.delay(30 * 60_000L)
+                kotlinx.coroutines.delay(10 * 60_000L)
             }
         }
     }
@@ -137,16 +141,17 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { purgeOldPlates() }
     }
 
-    fun setAutoDeleteDays(days: Int) {
-        prefs.edit().putInt(KEY_AUTO_DELETE_DAYS, days).apply()
-        _autoDeleteDays.value = days
+    fun setAutoDeleteHours(hours: Int) {
+        val h = hours.coerceIn(1, 90 * 24)
+        prefs.edit().putInt(KEY_AUTO_DELETE_HOURS, h).apply()
+        _autoDeleteHours.value = h
         viewModelScope.launch { purgeOldPlates() }
     }
 
-    /** Deletes plates not seen for the set number of days, except watched or starred ones. */
+    /** Deletes plates not seen for the set time, except watched or starred ones. */
     private suspend fun purgeOldPlates() {
         if (!_autoDelete.value) return
-        val cutoff = System.currentTimeMillis() - _autoDeleteDays.value * 24L * 60 * 60 * 1000
+        val cutoff = System.currentTimeMillis() - _autoDeleteHours.value * 60L * 60 * 1000
         try {
             repository.deleteOlderThan(cutoff)
         } catch (t: Throwable) {
@@ -359,6 +364,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_CAPTURE_MODE = "capture_mode"
         const val KEY_AUTO_DELETE = "auto_delete"
         const val KEY_AUTO_DELETE_DAYS = "auto_delete_days"
+        const val KEY_AUTO_DELETE_HOURS = "auto_delete_hours"
         const val KEY_DETECT_THRESHOLD = "detect_threshold_pct"
         const val KEY_READ_THRESHOLD = "read_threshold_pct"
         const val KEY_PHOTO_INTERVAL = "photo_interval_ms"

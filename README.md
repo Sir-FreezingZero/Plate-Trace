@@ -46,7 +46,7 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Read plates from:** *Video* (live 1080p feed, several images a second; default) or *Photos* (a full-resolution photo every 0.5–3 s; sharper and reads further on many phones, but fewer images, so fast-passing cars may be missed). In photo mode a single clear read is enough to save a car that only appears in one photo.
 - **Matching readings to save:** 2–5 frames must read exactly the same text before a plate is saved (default 3).
 - **Save the same plate again after:** how long a plate must be out of view before it's saved again.
-- **Auto-delete old plates:** when on, plates not seen for the set number of days (1–90) are deleted with their images, checked at startup and every 30 minutes. Plates with an alert (bell) or a star are always kept.
+- **Auto-delete old plates:** when on, plates not seen for the set time (1 hour to 90 days; type e.g. `5h` or `10d`) are deleted with their images, checked at startup and every 10 minutes. Plates with an alert (bell) or a star are always kept.
 - **Show live readings:** while recording, draws a box around every plate the detector finds, with a strip on top showing the plate number read in that frame and a strip underneath showing status only: `2/3` (matching readings), `saved`, `unsure`, or `—` (not a plate format). White while reading, green once saved, amber when rejected. Also shows the image size being read and how long each one takes. Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 

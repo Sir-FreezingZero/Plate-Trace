@@ -97,7 +97,7 @@ fun SettingsPage(
     val detectThreshold by viewModel.detectThreshold.collectAsStateWithLifecycle()
     val readThreshold by viewModel.readThreshold.collectAsStateWithLifecycle()
     val autoDelete by viewModel.autoDelete.collectAsStateWithLifecycle()
-    val autoDeleteDays by viewModel.autoDeleteDays.collectAsStateWithLifecycle()
+    val autoDeleteHours by viewModel.autoDeleteHours.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
     val specific = rules.mode == FormatMode.SPECIFIC
@@ -261,16 +261,12 @@ fun SettingsPage(
                     checked = autoDelete,
                     onChange = viewModel::setAutoDelete,
                 )
-                SliderRow(
+                DurationSliderRow(
                     title = "Delete after",
-                    description = "Days since the plate was last seen.",
-                    value = autoDeleteDays.toFloat(),
-                    range = 1f..90f,
-                    step = 1f,
-                    unit = "d",
-                    decimals = 0,
+                    description = "Time since the plate was last seen. Type e.g. 5h or 10d.",
+                    hours = autoDeleteHours,
                     enabled = autoDelete,
-                    onChange = { viewModel.setAutoDeleteDays(it.roundToInt()) },
+                    onChange = viewModel::setAutoDeleteHours,
                 )
                 Row(
                     Modifier
@@ -459,6 +455,121 @@ private fun SliderRow(
                     onChange(v)
                 },
             )
+        }
+    }
+}
+
+/** Slider stops, in hours: hours first, then days, then weeks/months. */
+private val DurationStops = listOf(
+    1, 2, 3, 4, 6, 8, 12, 18,
+    24, 36, 48, 72, 96, 120,
+    168, 336, 504, 672,
+    720, 1080, 1440, 2160,
+)
+
+/** "6 h", "36 h", "2 d", "30 d". Whole days show as days; everything else as hours. */
+private fun formatDuration(hours: Int): String =
+    if (hours >= 24 && hours % 24 == 0) "${hours / 24} d" else "$hours h"
+
+/** "5h", "5 h", "10d", "1.5d"; a bare number uses [defaultUnitDays] to pick the unit. */
+private fun parseDuration(text: String, defaultUnitDays: Boolean): Int? {
+    val t = text.trim().lowercase().replace(',', '.')
+    val m = Regex("^([0-9]*\\.?[0-9]+)\\s*([hd]?)").find(t) ?: return null
+    val n = m.groupValues[1].toFloatOrNull() ?: return null
+    val days = when (m.groupValues[2]) { "d" -> true; "h" -> false; else -> defaultUnitDays }
+    return (if (days) n * 24 else n).roundToInt().takeIf { it >= 1 }
+}
+
+/** Slider over [DurationStops] with an editable "6 h" / "2 d" box on the right. */
+@Composable
+private fun DurationSliderRow(
+    title: String,
+    description: String,
+    hours: Int,
+    enabled: Boolean,
+    onChange: (Int) -> Unit,
+) {
+    fun nearestIndex(h: Int) = DurationStops.indices.minByOrNull { kotlin.math.abs(DurationStops[it] - h) } ?: 0
+    var index by remember(hours) { mutableFloatStateOf(nearestIndex(hours).toFloat()) }
+    var shown by remember(hours) { mutableStateOf(hours) }
+    var text by remember(shown) { mutableStateOf(formatDuration(shown)) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    fun commitText() {
+        val parsed = parseDuration(text, defaultUnitDays = shown >= 24 && shown % 24 == 0)
+        if (parsed != null) {
+            shown = parsed.coerceIn(1, DurationStops.last())
+            index = nearestIndex(shown).toFloat()
+            onChange(shown)
+        }
+        text = formatDuration(shown)
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(RowPadding)
+            .padding(top = 6.dp)
+            .alpha(if (enabled) 1f else 0.38f),
+    ) {
+        RowText(title, description)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Slider(
+                value = index,
+                onValueChange = {
+                    index = it.roundToInt().toFloat()
+                    shown = DurationStops[index.toInt()]
+                    text = formatDuration(shown)
+                },
+                onValueChangeFinished = { onChange(shown) },
+                valueRange = 0f..(DurationStops.size - 1).toFloat(),
+                steps = DurationStops.size - 2,
+                enabled = enabled,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Accent,
+                    inactiveTrackColor = FieldColor,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                    disabledThumbColor = Color.White,
+                    disabledActiveTrackColor = Accent,
+                    disabledInactiveTrackColor = FieldColor,
+                    disabledActiveTickColor = Color.Transparent,
+                    disabledInactiveTickColor = Color.Transparent,
+                ),
+                modifier = Modifier.weight(1f).height(32.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(
+                Modifier
+                    .width(68.dp)
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(FieldColor)
+                    .border(1.dp, if (focused) Accent else LineColor, RoundedCornerShape(5.dp))
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                BasicTextField(
+                    value = text,
+                    onValueChange = { text = it.take(7) },
+                    enabled = enabled,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.End,
+                    ),
+                    cursorBrush = SolidColor(Accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged {
+                            if (focused && !it.isFocused) commitText()
+                            focused = it.isFocused
+                        },
+                )
+            }
         }
     }
 }
