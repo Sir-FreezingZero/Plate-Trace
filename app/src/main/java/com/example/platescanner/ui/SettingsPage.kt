@@ -4,13 +4,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,14 +17,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -41,18 +36,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,17 +63,11 @@ import com.example.platescanner.scan.FormatMode
 import com.example.platescanner.scan.PlateTextFilter
 import kotlin.math.roundToInt
 
-private val AgreeOptions = listOf(2, 3, 4, 5)
-
-private val PhotoIntervals = listOf(500L to "0.5 s", 1_000L to "1 s", 2_000L to "2 s", 3_000L to "3 s")
-
-private val CooldownOptions = listOf(5 to "5 s", 15 to "15 s", 60 to "1 min", 300 to "5 min")
-
 /** Preset formats: mask (L = letter, 0 = digit), example, where it's used. */
 private data class FormatPreset(val mask: String, val example: String, val note: String)
 
 private val FormatPresets = listOf(
-    FormatPreset("LLL0000", "ABC 1234", "NY, PA, TX and many other states"),
+    FormatPreset("LLL0000", "ABC 1234", "NY, PA, TX and many others"),
     FormatPreset("0LLL000", "1ABC234", "California"),
     FormatPreset("L00LLL", "A12 BCD", "New Jersey"),
     FormatPreset("LLL000", "ABC 123", "3 letters, 3 numbers"),
@@ -81,10 +75,9 @@ private val FormatPresets = listOf(
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
 )
 
-private const val MIN_SCALE = 2f
-private const val MAX_SCALE = 9f
+private val RowPadding = Modifier.padding(horizontal = 20.dp)
 
-/** Full-screen settings page; like the plates page, recording keeps running underneath. */
+/** Full-screen settings page; recording keeps running underneath. */
 @Composable
 fun SettingsPage(
     visible: Boolean,
@@ -103,6 +96,8 @@ fun SettingsPage(
     val photoInterval by viewModel.photoIntervalMs.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
+    val specific = rules.mode == FormatMode.SPECIFIC
+    val photos = captureMode == CaptureMode.PHOTO
 
     FullPage(visible = visible) {
         PageHeader(
@@ -115,164 +110,138 @@ fun SettingsPage(
 
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
 
-            // --- Plate format -------------------------------------------------------------
-            SectionLabel("Plate format")
-            ChoiceRow(
-                title = "US plates",
-                body = "Must have both letters and numbers. Blocks phone numbers; " +
-                    "may still catch some sign text.",
-                selected = rules.mode == FormatMode.US,
-                onClick = { viewModel.setFormatMode(FormatMode.US) },
-            )
-            ChoiceRow(
-                title = "Only specific formats",
-                body = "Strictest. Only the formats ticked below are saved, and look-alike " +
-                    "characters (0/O, 8/B, 5/S) are corrected to fit.",
-                selected = rules.mode == FormatMode.SPECIFIC,
-                onClick = { viewModel.setFormatMode(FormatMode.SPECIFIC) },
-            )
-            if (rules.mode == FormatMode.SPECIFIC) {
-                FormatList(
-                    masks = rules.masks,
-                    onToggle = viewModel::setMaskEnabled,
+            Section("Plate format") {
+                ChoiceRow(
+                    title = "Accept",
+                    description = when (rules.mode) {
+                        FormatMode.US -> "Letters and numbers both required. Blocks phone numbers."
+                        FormatMode.SPECIFIC -> "Only the formats switched on below. Fixes look-alikes (0/O, 8/B)."
+                        FormatMode.ANY -> "Any plate-like text. Will also catch phone numbers and signs."
+                    },
+                    options = listOf("US plates", "Specific", "Any"),
+                    selected = when (rules.mode) {
+                        FormatMode.US -> 0
+                        FormatMode.SPECIFIC -> 1
+                        FormatMode.ANY -> 2
+                    },
+                    onSelect = {
+                        viewModel.setFormatMode(
+                            when (it) { 0 -> FormatMode.US; 1 -> FormatMode.SPECIFIC; else -> FormatMode.ANY }
+                        )
+                    },
                 )
-            }
-            ChoiceRow(
-                title = "Any plate-like text",
-                body = "Most permissive. Will also save phone numbers and sign text.",
-                selected = rules.mode == FormatMode.ANY,
-                onClick = { viewModel.setFormatMode(FormatMode.ANY) },
-            )
-
-            Divider()
-
-            // --- Capture --------------------------------------------------------------
-            SectionLabel("Capture")
-            SettingBlock(
-                title = "Read plates from",
-                body = if (captureMode == CaptureMode.VIDEO) {
-                    "Video: reads the live camera feed (1080p), several images a second. " +
-                        "Best for moving traffic."
-                } else {
-                    "Photos: takes a full-resolution photo at a set interval and reads that. " +
-                        "Sharper on many phones and reads plates further away, but fewer " +
-                        "images per second, so fast-passing cars may be missed."
-                },
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OptionChip("Video", selected = captureMode == CaptureMode.VIDEO) {
-                        viewModel.setCaptureMode(CaptureMode.VIDEO)
-                    }
-                    OptionChip("Photos", selected = captureMode == CaptureMode.PHOTO) {
-                        viewModel.setCaptureMode(CaptureMode.PHOTO)
-                    }
-                }
-                if (captureMode == CaptureMode.PHOTO) {
-                    Text(
-                        "Take a photo every",
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                FormatPresets.forEach { preset ->
+                    ToggleRow(
+                        title = preset.example,
+                        description = preset.note,
+                        monospaceTitle = true,
+                        checked = preset.mask in rules.masks,
+                        enabled = specific,
+                        onChange = { viewModel.setMaskEnabled(preset.mask, it) },
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        PhotoIntervals.forEach { (ms, label) ->
-                            OptionChip(label, selected = photoInterval == ms) {
-                                viewModel.setPhotoInterval(ms)
-                            }
-                        }
-                    }
+                }
+                val presetMasks = FormatPresets.map { it.mask }.toSet()
+                rules.masks.filter { it !in presetMasks }.forEach { mask ->
+                    ToggleRow(
+                        title = mask,
+                        description = "Custom",
+                        monospaceTitle = true,
+                        checked = true,
+                        enabled = specific,
+                        onChange = { viewModel.setMaskEnabled(mask, it) },
+                    )
+                }
+                AddFormatRow(enabled = specific, onAdd = { viewModel.setMaskEnabled(it, true) })
+                if (specific && rules.masks.isEmpty()) {
                     Text(
-                        "If the phone needs longer than this to read a photo, the next one " +
-                            "is taken as soon as it's done.",
-                        color = Muted,
+                        "No formats on: nothing will be saved.",
+                        color = RecordRed,
                         fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 6.dp),
+                        modifier = RowPadding.padding(bottom = 4.dp),
                     )
                 }
             }
-            SettingBlock(
-                title = "Matching readings to save",
-                body = "How many frames must read exactly the same text before a plate is " +
-                    "saved. Fewer saves faster; more is more accurate. A stray misread in " +
-                    "between doesn't reset the count. Tested: 2 = 91%, 3 = 96% correct.",
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    AgreeOptions.forEach { n ->
-                        OptionChip(n.toString(), selected = agree == n) { viewModel.setAgreeReads(n) }
-                    }
-                }
-            }
-            SettingBlock(
-                title = "Save the same plate again after",
-                body = "A plate is saved once while it stays in view. It's saved again only " +
-                    "after it hasn't been seen for this long.",
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    CooldownOptions.forEach { (seconds, label) ->
-                        OptionChip(label, selected = cooldown == seconds) {
-                            viewModel.setCooldown(seconds)
-                        }
-                    }
-                }
-            }
 
-            SettingBlock(
-                title = "Car shot framing",
-                body = "How far the car photo zooms out around the plate. The plate is " +
-                    "always in the centre, and the plate crop itself stays tight. " +
-                    "Applies to new sightings.",
-            ) {
-                FramingControl(
-                    scale = scale,
-                    onScaleChange = viewModel::setVehicleScale,
+            Section("Capture") {
+                ToggleRow(
+                    title = "Use photos instead of video",
+                    description = "Full-resolution photos: sharper, reads further, fewer per second.",
+                    checked = photos,
+                    onChange = { viewModel.setCaptureMode(if (it) CaptureMode.PHOTO else CaptureMode.VIDEO) },
+                )
+                SliderRow(
+                    title = "Photo interval",
+                    description = "Time between photos.",
+                    value = photoInterval / 1000f,
+                    range = 0.5f..3f,
+                    step = 0.5f,
+                    unit = "s",
+                    decimals = 1,
+                    enabled = photos,
+                    onChange = { viewModel.setPhotoInterval((it * 1000).roundToInt().toLong()) },
+                )
+                SliderRow(
+                    title = "Matching readings to save",
+                    description = "Identical reads needed before saving. 2 = faster, 3+ = more accurate.",
+                    value = agree.toFloat(),
+                    range = 2f..5f,
+                    step = 1f,
+                    unit = "",
+                    decimals = 0,
+                    onChange = { viewModel.setAgreeReads(it.roundToInt()) },
+                )
+                SliderRow(
+                    title = "Save same plate again after",
+                    description = "Time out of view before a plate can be saved again.",
+                    value = cooldown.toFloat(),
+                    range = 5f..300f,
+                    step = 5f,
+                    unit = "s",
+                    decimals = 0,
+                    onChange = { viewModel.setCooldown(it.roundToInt()) },
+                )
+                SliderRow(
+                    title = "Car shot width",
+                    description = "Zoom-out around the plate. Plate crop unaffected.",
+                    value = scale,
+                    range = 2f..9f,
+                    step = 0.5f,
+                    unit = "×",
+                    decimals = 1,
+                    trailing = { v -> FramingPreview(v) },
+                    onChange = viewModel::setVehicleScale,
                 )
             }
 
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { viewModel.setShowLive(!showLive) }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Show live readings", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text(
-                        "While recording, show what the reader sees in each frame: the text, " +
-                            "how sure it is, and the plate's size in pixels.",
-                        color = Muted,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Switch(
+            Section("Display") {
+                ToggleRow(
+                    title = "Show live readings",
+                    description = "Boxes and readings over the camera while recording.",
                     checked = showLive,
-                    onCheckedChange = viewModel::setShowLive,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.Black,
-                        checkedTrackColor = Accent,
-                    ),
+                    onChange = viewModel::setShowLive,
                 )
             }
 
-            Divider()
-
-            // --- Storage --------------------------------------------------------------
-            SectionLabel("Storage")
-            SettingBlock(
-                title = "Saved data",
-                body = "${plates.size} plates · $sightings sightings · stored on this phone only",
-            )
-            Text(
-                "Delete all plates",
-                color = if (plates.isNotEmpty()) RecordRed else Muted,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = plates.isNotEmpty()) { confirmClear = true }
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-            )
+            Section("Storage") {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = plates.isNotEmpty()) { confirmClear = true }
+                        .then(RowPadding)
+                        .padding(vertical = 8.dp)
+                        .alpha(if (plates.isNotEmpty()) 1f else 0.38f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Delete all plates", color = RecordRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "${plates.size} plates · $sightings sightings · on this phone only",
+                            color = Muted,
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -295,294 +264,329 @@ fun SettingsPage(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Plate format
+// Building blocks
 // ---------------------------------------------------------------------------------------------
 
+/** Header with an underline that stops just short of the screen edges, then its rows. */
 @Composable
-private fun ChoiceRow(title: String, body: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(start = 8.dp, end = 20.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = Accent, unselectedColor = Muted),
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Text(
+            title.uppercase(),
+            color = Muted,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            modifier = RowPadding,
         )
-        Column(Modifier.padding(top = 12.dp)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            Text(body, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-        }
+        HorizontalDivider(
+            Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 2.dp),
+            color = LineColor,
+        )
+        content()
     }
 }
 
-/** Preset formats as checkboxes, plus any custom formats, plus a field to add one. */
 @Composable
-private fun FormatList(masks: List<String>, onToggle: (String, Boolean) -> Unit) {
-    val presetMasks = FormatPresets.map { it.mask }.toSet()
-    val custom = masks.filter { it !in presetMasks }
-
-    Column(Modifier.padding(start = 44.dp, end = 20.dp, bottom = 8.dp)) {
-        FormatPresets.forEach { preset ->
-            CheckRow(
-                label = preset.example,
-                note = preset.note,
-                checked = preset.mask in masks,
-                onChange = { onToggle(preset.mask, it) },
-            )
-        }
-        custom.forEach { mask ->
-            CheckRow(
-                label = mask,
-                note = "Custom",
-                checked = true,
-                onChange = { onToggle(mask, it) },
-            )
-        }
-        AddCustomFormat(onAdd = { onToggle(it, true) })
-        if (masks.isEmpty()) {
-            Text(
-                "No formats ticked: nothing will be saved.",
-                color = RecordRed,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 6.dp),
-            )
+private fun RowText(
+    title: String,
+    description: String?,
+    monospaceTitle: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(
+            title,
+            fontSize = 14.sp,
+            fontWeight = if (monospaceTitle) FontWeight.Bold else FontWeight.Medium,
+            fontFamily = if (monospaceTitle) FontFamily.Monospace else FontFamily.Default,
+            maxLines = 1,
+        )
+        if (description != null) {
+            Text(description, color = Muted, fontSize = 11.sp, lineHeight = 14.sp)
         }
     }
 }
 
 @Composable
-private fun CheckRow(label: String, note: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(
+    title: String,
+    description: String?,
+    checked: Boolean,
+    enabled: Boolean = true,
+    monospaceTitle: Boolean = false,
+    onChange: (Boolean) -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(40.dp)
-            .clickable { onChange(!checked) },
+            .clickable(enabled = enabled) { onChange(!checked) }
+            .then(RowPadding)
+            .padding(vertical = 2.dp)
+            .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(
+        RowText(title, description, monospaceTitle, Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        Switch(
             checked = checked,
             onCheckedChange = onChange,
-            colors = CheckboxDefaults.colors(
-                checkedColor = Accent,
-                uncheckedColor = Muted,
-                checkmarkColor = Color.Black,
+            enabled = enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.Black,
+                checkedTrackColor = Accent,
+                disabledCheckedThumbColor = Color.Black,
+                disabledCheckedTrackColor = Accent,
             ),
         )
-        Text(
-            label,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            modifier = Modifier.width(96.dp),
+    }
+}
+
+/** Slider with an editable number box on its right. */
+@Composable
+private fun SliderRow(
+    title: String,
+    description: String?,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    step: Float,
+    unit: String,
+    decimals: Int,
+    enabled: Boolean = true,
+    trailing: (@Composable (Float) -> Unit)? = null,
+    onChange: (Float) -> Unit,
+) {
+    fun snap(v: Float): Float {
+        val snapped = ((v - range.start) / step).roundToInt() * step + range.start
+        return snapped.coerceIn(range.start, range.endInclusive)
+    }
+    var current by remember(value) { mutableFloatStateOf(value) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(RowPadding)
+            .padding(top = 6.dp)
+            .alpha(if (enabled) 1f else 0.38f),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RowText(title, description, modifier = Modifier.weight(1f))
+            if (trailing != null) {
+                Spacer(Modifier.width(8.dp))
+                trailing(current)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Slider(
+                value = current,
+                onValueChange = { current = snap(it) },
+                onValueChangeFinished = { onChange(current) },
+                valueRange = range,
+                steps = (((range.endInclusive - range.start) / step).roundToInt() - 1).coerceAtLeast(0),
+                enabled = enabled,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Accent,
+                    inactiveTrackColor = FieldColor,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                    disabledThumbColor = Color.White,
+                    disabledActiveTrackColor = Accent,
+                    disabledInactiveTrackColor = FieldColor,
+                    disabledActiveTickColor = Color.Transparent,
+                    disabledInactiveTickColor = Color.Transparent,
+                ),
+                modifier = Modifier.weight(1f).height(32.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            NumberBox(
+                value = current,
+                decimals = decimals,
+                unit = unit,
+                enabled = enabled,
+                onCommit = {
+                    val v = snap(it)
+                    current = v
+                    onChange(v)
+                },
+            )
+        }
+    }
+}
+
+/** Small editable number field; commits on Done or when it loses focus. */
+@Composable
+private fun NumberBox(value: Float, decimals: Int, unit: String, enabled: Boolean, onCommit: (Float) -> Unit) {
+    fun format(v: Float) = if (decimals == 0) v.roundToInt().toString() else "%.${decimals}f".format(v)
+    var text by remember(value) { mutableStateOf(format(value)) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    fun commit() {
+        val parsed = text.replace(',', '.').toFloatOrNull()
+        if (parsed != null) onCommit(parsed) else text = format(value)
+    }
+
+    Row(
+        Modifier
+            .width(68.dp)
+            .height(30.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(FieldColor)
+            .border(1.dp, if (focused) Accent else LineColor, RoundedCornerShape(5.dp))
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicTextField(
+            value = text,
+            onValueChange = { text = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(5) },
+            enabled = enabled,
+            singleLine = true,
+            textStyle = TextStyle(
+                color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End,
+            ),
+            cursorBrush = SolidColor(Accent),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+            modifier = Modifier
+                .weight(1f)
+                .onFocusChanged {
+                    if (focused && !it.isFocused) commit()
+                    focused = it.isFocused
+                },
         )
-        Text(note, color = Muted, fontSize = 12.sp, maxLines = 1)
+        if (unit.isNotEmpty()) {
+            Text(unit, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 3.dp))
+        }
+    }
+}
+
+/** Title with a compact segmented choice on the right, description below. */
+@Composable
+private fun ChoiceRow(
+    title: String,
+    description: String,
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .border(1.dp, LineColor, RoundedCornerShape(6.dp)),
+            ) {
+                options.forEachIndexed { i, label ->
+                    Text(
+                        label,
+                        color = if (i == selected) Color.Black else Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = if (i == selected) FontWeight.SemiBold else FontWeight.Normal,
+                        modifier = Modifier
+                            .background(if (i == selected) Color.White else Color.Transparent)
+                            .clickable { onSelect(i) }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+            }
+        }
+        Text(description, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
     }
 }
 
 @Composable
-private fun AddCustomFormat(onAdd: (String) -> Unit) {
+private fun AddFormatRow(enabled: Boolean, onAdd: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
     val cleaned = PlateTextFilter.cleanMask(text)
 
-    Column(Modifier.padding(top = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(FieldColor)
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                if (text.isEmpty()) Text("Custom, e.g. LL0L000", color = Muted, fontSize = 13.sp)
-                BasicTextField(
-                    value = text,
-                    onValueChange = { text = it.uppercase().take(9) },
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        color = Color.White, fontSize = 14.sp, fontFamily = FontFamily.Monospace,
-                    ),
-                    cursorBrush = SolidColor(Accent),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-                    modifier = Modifier.fillMaxWidth(),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(RowPadding)
+            .padding(vertical = 4.dp)
+            .alpha(if (enabled) 1f else 0.38f),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .weight(1f)
+                .height(30.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(FieldColor)
+                .border(1.dp, LineColor, RoundedCornerShape(5.dp))
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (text.isEmpty()) {
+                Text(
+                    "Custom format, e.g. LL0L000 (L letter, 0 number, * either)",
+                    color = Muted, fontSize = 11.sp, maxLines = 1,
                 )
             }
-            TextButton(
-                onClick = {
+            BasicTextField(
+                value = text,
+                onValueChange = { text = it.uppercase().take(9) },
+                enabled = enabled,
+                singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace),
+                cursorBrush = SolidColor(Accent),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "Add",
+            color = if (enabled && cleaned != null) Accent else Muted,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clickable(enabled = enabled && cleaned != null) {
                     cleaned?.let(onAdd)
                     text = ""
-                },
-                enabled = cleaned != null,
-            ) { Text("Add", color = if (cleaned != null) Accent else Muted) }
-        }
-        Text(
-            "L = letter, 0 = number, * = either",
-            color = if (text.isNotEmpty() && cleaned == null) RecordRed else Muted,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 2.dp),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------------------------
-// Car shot framing
-// ---------------------------------------------------------------------------------------------
-
-@Composable
-private fun FramingControl(scale: Float, onScaleChange: (Float) -> Unit) {
-    // Local value while dragging; saved when the drag ends.
-    var value by remember(scale) { mutableFloatStateOf(scale) }
-
-    Column {
-        FramingPreview(
-            scale = value,
-            modifier = Modifier.fillMaxWidth(0.62f).align(Alignment.CenterHorizontally),
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Tighter", color = Muted, fontSize = 12.sp)
-            Spacer(Modifier.weight(1f))
-            Text(
-                "%.1f× plate width".format(value),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-            )
-            Spacer(Modifier.weight(1f))
-            Text("Wider", color = Muted, fontSize = 12.sp)
-        }
-        Slider(
-            value = value,
-            onValueChange = { value = (it * 2).roundToInt() / 2f }, // 0.5 steps
-            onValueChangeFinished = { onScaleChange(value) },
-            valueRange = MIN_SCALE..MAX_SCALE,
-            steps = ((MAX_SCALE - MIN_SCALE) * 2).toInt() - 1,
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Accent,
-                inactiveTrackColor = FieldColor,
-                activeTickColor = Color.Transparent,
-                inactiveTickColor = Color.Transparent,
-            ),
+                }
+                .padding(horizontal = 6.dp, vertical = 6.dp),
         )
     }
 }
 
 /**
- * Sketch of what the car shot will contain at [scale]: the frame (same 5:4 shape as the saved
- * photo), a rough car outline, and the plate, centred, at the size used for cropping.
- * Approximate: assumes a typical car rear is about 6× as wide as its plate.
+ * Tiny sketch of the car shot at [scale]: the 5:4 frame, a rough car outline and the plate,
+ * centred, at the size used for cropping. Approximate (assumes a car rear ≈ 6× plate width).
  */
 @Composable
-private fun FramingPreview(scale: Float, modifier: Modifier = Modifier) {
+private fun FramingPreview(scale: Float) {
     Box(
-        modifier
-            .aspectRatio(5f / 4f)
-            .clip(RoundedCornerShape(6.dp))
+        Modifier
+            .size(width = 50.dp, height = 40.dp)
+            .clip(RoundedCornerShape(4.dp))
             .background(ThumbBackground)
-            .border(1.dp, LineColor, RoundedCornerShape(6.dp)),
+            .border(1.dp, LineColor, RoundedCornerShape(4.dp)),
     ) {
-        Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.size(width = 50.dp, height = 40.dp)) {
             val w = size.width
             val h = size.height
-            val plateW = w / scale             // car shot = scale × plate width
+            val plateW = w / scale
             val plateH = plateW / 2f
-            val plateCx = w / 2f
-            val plateCy = h / 2f               // plate is always centred
-
+            val cx = w / 2f
+            val cy = h / 2f
             val carW = plateW * 6f
             val carH = carW * 0.55f
-            val carLeft = plateCx - carW / 2f
-            val carTop = plateCy - carH * 0.62f
-
             clipRect {
-                // Car body
                 drawRoundRect(
-                    color = Color.White.copy(alpha = 0.10f),
-                    topLeft = Offset(carLeft, carTop),
+                    Color.White.copy(alpha = 0.16f),
+                    topLeft = Offset(cx - carW / 2f, cy - carH * 0.62f),
                     size = Size(carW, carH),
                     cornerRadius = CornerRadius(carW * 0.06f),
                 )
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.35f),
-                    topLeft = Offset(carLeft, carTop),
-                    size = Size(carW, carH),
-                    cornerRadius = CornerRadius(carW * 0.06f),
-                    style = Stroke(1.dp.toPx()),
-                )
-                // Rear window
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.18f),
-                    topLeft = Offset(carLeft + carW * 0.18f, carTop + carH * 0.08f),
-                    size = Size(carW * 0.64f, carH * 0.30f),
-                    cornerRadius = CornerRadius(carW * 0.03f),
-                )
-                // Plate
-                drawRoundRect(
-                    color = Color(0xFFF4F4F2),
-                    topLeft = Offset(plateCx - plateW / 2f, plateCy - plateH / 2f),
+                drawRect(
+                    Color(0xFFF4F4F2),
+                    topLeft = Offset(cx - plateW / 2f, cy - plateH / 2f),
                     size = Size(plateW, plateH),
-                    cornerRadius = CornerRadius(2.dp.toPx()),
                 )
             }
         }
     }
-}
-
-// ---------------------------------------------------------------------------------------------
-// Shared bits
-// ---------------------------------------------------------------------------------------------
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text.uppercase(),
-        color = Muted,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp),
-    )
-}
-
-@Composable
-private fun SettingBlock(
-    title: String,
-    body: String,
-    control: (@Composable () -> Unit)? = null,
-) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-        Text(body, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-        if (control != null) {
-            Spacer(Modifier.height(10.dp))
-            control()
-        }
-    }
-}
-
-@Composable
-private fun Divider() {
-    HorizontalDivider(Modifier.padding(top = 12.dp), color = LineColor)
-}
-
-@Composable
-private fun OptionChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        label,
-        color = if (selected) Color.Black else Color.White,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        fontSize = 13.sp,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) Color.White else FieldColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-    )
 }
