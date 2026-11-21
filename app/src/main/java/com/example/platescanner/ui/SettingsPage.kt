@@ -115,7 +115,70 @@ fun SettingsPage(
         // Full-width line under the header.
         HorizontalDivider(Modifier.fillMaxWidth().padding(top = 4.dp), color = LineColor)
 
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
+
+            Section("Capture") {
+                ToggleRow(
+                    title = "Use photos instead of video",
+                    description = "Full-resolution photos: sharper and reads further, but fewer per second.",
+                    checked = photos,
+                    onChange = { viewModel.setCaptureMode(if (it) CaptureMode.PHOTO else CaptureMode.VIDEO) },
+                )
+                SliderRow(
+                    title = "Photo interval",
+                    description = "Time between photos in photo mode.",
+                    value = photoInterval / 1000f,
+                    range = 0.5f..3f,
+                    step = 0.5f,
+                    unit = "s",
+                    decimals = 1,
+                    enabled = photos,
+                    onChange = { viewModel.setPhotoInterval((it * 1000).roundToInt().toLong()) },
+                )
+            }
+
+            Section("Reading") {
+                SliderRow(
+                    title = "Plate detection confidence",
+                    description = "Lower finds more plates, including distant ones and false boxes.",
+                    value = detectThreshold.toFloat(),
+                    range = 5f..95f,
+                    step = 5f,
+                    unit = "%",
+                    decimals = 0,
+                    onChange = { viewModel.setDetectThreshold(it.roundToInt()) },
+                )
+                SliderRow(
+                    title = "Reading confidence",
+                    description = "Every character must be read at least this surely.",
+                    value = readThreshold.toFloat(),
+                    range = 5f..95f,
+                    step = 5f,
+                    unit = "%",
+                    decimals = 0,
+                    onChange = { viewModel.setReadThreshold(it.roundToInt()) },
+                )
+                SliderRow(
+                    title = "Matching readings to save",
+                    description = "Identical reads needed. 2 is faster, 3+ is more accurate.",
+                    value = agree.toFloat(),
+                    range = 2f..5f,
+                    step = 1f,
+                    unit = "",
+                    decimals = 0,
+                    onChange = { viewModel.setAgreeReads(it.roundToInt()) },
+                )
+                SliderRow(
+                    title = "Save same plate again after",
+                    description = "Time out of view before it can be saved again.",
+                    value = cooldown.toFloat(),
+                    range = 5f..300f,
+                    step = 5f,
+                    unit = "s",
+                    decimals = 0,
+                    onChange = { viewModel.setCooldown(it.roundToInt()) },
+                )
+            }
 
             Section("Plate format") {
                 ChoiceRow(
@@ -123,7 +186,7 @@ fun SettingsPage(
                     description = when (rules.mode) {
                         FormatMode.US -> "Letters and numbers both required. Blocks phone numbers."
                         FormatMode.SPECIFIC -> "Only the formats switched on below. Fixes look-alikes (0/O, 8/B)."
-                        FormatMode.ANY -> "Any plate-like text. Will also catch phone numbers and signs."
+                        FormatMode.ANY -> "Any plate-like text, including phone numbers and signs."
                     },
                     options = listOf("US plates", "Specific", "Any"),
                     selected = when (rules.mode) {
@@ -137,6 +200,7 @@ fun SettingsPage(
                         )
                     },
                 )
+                SubLabel(if (specific) "Formats" else "Formats (used with Specific)", enabled = specific)
                 FormatPresets.forEach { preset ->
                     ToggleRow(
                         title = preset.example,
@@ -169,72 +233,10 @@ fun SettingsPage(
                 }
             }
 
-            Section("Detection") {
-                SliderRow(
-                    title = "Plate detection confidence",
-                    description = "How sure it must be that something is a plate before reading it. " +
-                        "Lower finds more (incl. distant plates and false boxes).",
-                    value = detectThreshold.toFloat(),
-                    range = 5f..95f,
-                    step = 5f,
-                    unit = "%",
-                    decimals = 0,
-                    onChange = { viewModel.setDetectThreshold(it.roundToInt()) },
-                )
-                SliderRow(
-                    title = "Reading confidence",
-                    description = "How sure it must be of every character before using a reading. " +
-                        "Lower accepts more (and more misreads).",
-                    value = readThreshold.toFloat(),
-                    range = 5f..95f,
-                    step = 5f,
-                    unit = "%",
-                    decimals = 0,
-                    onChange = { viewModel.setReadThreshold(it.roundToInt()) },
-                )
-            }
-
-            Section("Capture") {
-                ToggleRow(
-                    title = "Use photos instead of video",
-                    description = "Full-resolution photos: sharper, reads further, fewer per second.",
-                    checked = photos,
-                    onChange = { viewModel.setCaptureMode(if (it) CaptureMode.PHOTO else CaptureMode.VIDEO) },
-                )
-                SliderRow(
-                    title = "Photo interval",
-                    description = "Time between photos.",
-                    value = photoInterval / 1000f,
-                    range = 0.5f..3f,
-                    step = 0.5f,
-                    unit = "s",
-                    decimals = 1,
-                    enabled = photos,
-                    onChange = { viewModel.setPhotoInterval((it * 1000).roundToInt().toLong()) },
-                )
-                SliderRow(
-                    title = "Matching readings to save",
-                    description = "Identical reads needed before saving. 2 = faster, 3+ = more accurate.",
-                    value = agree.toFloat(),
-                    range = 2f..5f,
-                    step = 1f,
-                    unit = "",
-                    decimals = 0,
-                    onChange = { viewModel.setAgreeReads(it.roundToInt()) },
-                )
-                SliderRow(
-                    title = "Save same plate again after",
-                    description = "Time out of view before a plate can be saved again.",
-                    value = cooldown.toFloat(),
-                    range = 5f..300f,
-                    step = 5f,
-                    unit = "s",
-                    decimals = 0,
-                    onChange = { viewModel.setCooldown(it.roundToInt()) },
-                )
+            Section("Saved images") {
                 SliderRow(
                     title = "Car shot width",
-                    description = "Zoom-out around the plate. Plate crop unaffected.",
+                    description = "How far the car photo zooms out. The plate crop is unaffected.",
                     value = scale,
                     range = 2f..9f,
                     step = 0.5f,
@@ -257,14 +259,13 @@ fun SettingsPage(
             Section("Storage") {
                 ToggleRow(
                     title = "Auto-delete old plates",
-                    description = "Deletes plates not seen for longer than the time below. " +
-                        "Plates with an alert (bell) or a star are always kept.",
+                    description = "Plates with a bell or star are always kept.",
                     checked = autoDelete,
                     onChange = viewModel::setAutoDelete,
                 )
                 DurationSliderRow(
                     title = "Delete after",
-                    description = "Time since the plate was last seen. Type e.g. 5h or 10d.",
+                    description = "Time since last seen. Type e.g. 5h or 10d.",
                     hours = autoDeleteHours,
                     enabled = autoDelete,
                     onChange = viewModel::setAutoDeleteHours,
@@ -274,20 +275,20 @@ fun SettingsPage(
                         .fillMaxWidth()
                         .clickable(enabled = plates.isNotEmpty()) { confirmClear = true }
                         .then(RowPadding)
-                        .padding(vertical = 8.dp)
+                        .padding(vertical = 10.dp)
                         .alpha(if (plates.isNotEmpty()) 1f else 0.38f),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Delete all plates", color = RecordRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text(
-                            "${plates.size} plates · $sightings sightings · on this phone only",
-                            color = Muted,
-                            fontSize = 11.sp,
-                        )
-                    }
+                    RowText(
+                        title = "Delete all plates",
+                        description = "${plates.size} plates · $sightings sightings · on this phone only",
+                        titleColor = RecordRed,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
+
+            AppVersion()
         }
     }
 
@@ -316,7 +317,7 @@ fun SettingsPage(
 /** Header with an underline that stops just short of the screen edges, then its rows. */
 @Composable
 private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
         Text(
             title.uppercase(),
             color = Muted,
@@ -326,11 +327,43 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
             modifier = RowPadding,
         )
         HorizontalDivider(
-            Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 2.dp),
+            Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
             color = LineColor,
         )
         content()
     }
+}
+
+/** Small label grouping the rows under it within a section. */
+@Composable
+private fun SubLabel(text: String, enabled: Boolean = true) {
+    Text(
+        text,
+        color = Muted,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = RowPadding
+            .padding(top = 6.dp, bottom = 2.dp)
+            .alpha(if (enabled) 1f else 0.6f),
+    )
+}
+
+/** App name and version, centred at the bottom of the page. */
+@Composable
+private fun AppVersion() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val version = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: ""
+    }
+    Text(
+        "Plate Scanner $version",
+        color = Muted.copy(alpha = 0.5f),
+        fontSize = 11.sp,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp),
+    )
 }
 
 @Composable
@@ -339,10 +372,12 @@ private fun RowText(
     description: String?,
     monospaceTitle: Boolean = false,
     modifier: Modifier = Modifier,
+    titleColor: Color = Color.Unspecified,
 ) {
     Column(modifier) {
         Text(
             title,
+            color = titleColor,
             fontSize = 14.sp,
             fontWeight = if (monospaceTitle) FontWeight.Bold else FontWeight.Medium,
             fontFamily = if (monospaceTitle) FontFamily.Monospace else FontFamily.Default,
@@ -412,7 +447,7 @@ private fun SliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 6.dp)
+            .padding(top = 8.dp, bottom = 2.dp)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
