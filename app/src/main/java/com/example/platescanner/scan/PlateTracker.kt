@@ -55,10 +55,18 @@ class PlateTracker {
         val confidences: FloatArray,
         val box: Rect,
         val crop: Bitmap,
+        /** Where the phone was when this frame/photo was taken (null if unknown). */
+        val location: android.location.Location? = null,
     )
 
     /** A plate to save. */
-    class Result(val plate: String, val rawText: String, val crop: Bitmap, val vehicle: Bitmap)
+    class Result(
+        val plate: String,
+        val rawText: String,
+        val crop: Bitmap,
+        val vehicle: Bitmap,
+        val location: android.location.Location? = null,
+    )
 
     private class Track(now: Long) {
         val firstAt = now
@@ -154,7 +162,9 @@ class PlateTracker {
             val largest = t.bestByText.values.maxByOrNull { it.first.box.width() } ?: continue
             // Prefer a photo that itself reads as the saved text.
             val (read, vehicle) = t.bestByText[plate] ?: largest
-            out.add(Result(plate, read.rawText, read.crop, vehicle))
+            // Location from the saved frame, or failing that from any read of this plate.
+            val location = read.location ?: t.reads.lastOrNull { it.location != null }?.location
+            out.add(Result(plate, read.rawText, read.crop, vehicle, location))
             t.committed = true
             t.savedText = plate
             t.reads.clear() // free bitmaps; from here on the track only keeps the plate "in view"

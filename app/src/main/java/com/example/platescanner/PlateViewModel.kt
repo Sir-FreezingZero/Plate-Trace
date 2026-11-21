@@ -128,6 +128,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         analyzer.vehicleScale = _vehicleScale.value
         PlateTextFilter.rules = _formatRules.value
         applyShowLive(_showLive.value)
+        analyzer.locationProvider = { if (_saveLocation.value) locationTracker.current() else null }
         analyzer.agreeReads = _agreeReads.value
         applyCapture()
         analyzer.detectThreshold = _detectThreshold.value / 100f
@@ -286,7 +287,11 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
             for (d in detections) {
                 try {
                     // Location only for live captures (not gallery photos), and only if recent.
-                    val location = if (live && _saveLocation.value) locationTracker.current() else null
+                    val location = if (live && _saveLocation.value) {
+                        d.location ?: locationTracker.current()
+                    } else {
+                        null
+                    }
                     val result = repository.save(d.plate, d.rawText, d.crop, d.vehicle, location)
                     if (location != null) lookUpPlace(result.sightingId, location.latitude, location.longitude)
                     // Also alert for a reading that differs from a watched plate only by

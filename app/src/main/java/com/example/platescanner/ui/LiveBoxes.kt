@@ -205,7 +205,7 @@ private fun Strip(text: String, color: Color, height: androidx.compose.ui.unit.D
 @Composable
 fun LiveStats(info: FrameInfo, modifier: Modifier = Modifier) {
     Text(
-        "${info.width}×${info.height} · ${info.millis} ms",
+        "${info.width}×${info.height} · ${info.millis} ms" + (info.locationText?.let { " · $it" } ?: ""),
         color = Color.White.copy(alpha = 0.75f),
         fontSize = 10.sp,
         fontFamily = FontFamily.Monospace,

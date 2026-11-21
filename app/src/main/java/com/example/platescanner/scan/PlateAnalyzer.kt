@@ -14,6 +14,8 @@ class PlateDetection(
     val rawText: String,
     val crop: Bitmap,
     val vehicle: Bitmap,
+    /** Where the phone was when the image was taken (null if unknown / not saved). */
+    val location: android.location.Location? = null,
 )
 
 /** One detected plate in a frame, for the optional live view. */
@@ -41,6 +43,8 @@ class FrameInfo(
     val height: Int,
     val millis: Long,
     val boxes: List<LiveBox>,
+    /** Location available when this image was taken, e.g. "±12 m", or "no location". */
+    val locationText: String? = null,
 )
 
 /**
@@ -133,13 +137,18 @@ class PlateAnalyzer(
     }
 
     private fun emit(r: PlateTracker.Result) =
-        onPlate(PlateDetection(r.plate, r.rawText, r.crop, r.vehicle))
+        onPlate(PlateDetection(r.plate, r.rawText, r.crop, r.vehicle, r.location))
+
+    /** Supplies the phone's current location when a frame/photo is taken (set by the app). */
+    @Volatile var locationProvider: (() -> android.location.Location?)? = null
 
     override fun analyze(imageProxy: ImageProxy) {
         if (!enabled) {
             imageProxy.close()
             return
         }
+        // Stamp the location now, at capture time, so it travels with the plate to saving.
+        val capturedAt = try { locationProvider?.invoke() } catch (t: Throwable) { null }
         val frame = try {
             imageProxy.toBitmap().rotated(imageProxy.imageInfo.rotationDegrees)
         } catch (t: Throwable) {
@@ -154,7 +163,7 @@ class PlateAnalyzer(
             val start = SystemClock.elapsedRealtime()
             val listener = onFrameInfo
             val live = if (listener != null) ArrayList<LiveBox>() else null
-            val reads = findAndRead(frame, live)
+            val reads = findAndRead(frame, live, capturedAt)
             val now = SystemClock.elapsedRealtime()
             // Every frame goes to the tracker, even with no reads, so it notices plates leaving.
             val scale = vehicleScale
@@ -166,7 +175,13 @@ class PlateAnalyzer(
                         b.copy(matches = st.matches, needed = st.needed, saved = st.saved, savedText = st.savedText)
                     }
                 }
-                listener(FrameInfo(frame.width, frame.height, now - start, withStatus))
+                val locText = when {
+                    locationProvider == null -> null
+                    capturedAt == null -> "no location"
+                    capturedAt.hasAccuracy() -> "±${capturedAt.accuracy.toInt()} m"
+                    else -> "location ok"
+                }
+                listener(FrameInfo(frame.width, frame.height, now - start, withStatus, locText))
             }
         } catch (t: Throwable) {
             Log.e(TAG, "Plate processing failed", t)
@@ -188,7 +203,11 @@ class PlateAnalyzer(
     }
 
     /** Steps 1–4: detect, crop, read, check format. */
-    private fun findAndRead(frame: Bitmap, live: MutableList<LiveBox>? = null): List<PlateTracker.Read> {
+    private fun findAndRead(
+        frame: Bitmap,
+        live: MutableList<LiveBox>? = null,
+        location: android.location.Location? = null,
+    ): List<PlateTracker.Read> {
         val models = engine ?: return emptyList()
         return models.detect(frame, detectThreshold).mapNotNull { detection ->
             val crop = frame.cropAround(detection.box)
@@ -210,7 +229,7 @@ class PlateAnalyzer(
             // confidences still line up with the characters.
             val confidences = if (plate.length == reading.confidences.size) reading.confidences
             else FloatArray(plate.length) { reading.minConfidence }
-            PlateTracker.Read(plate, reading.text, confidences, detection.box, crop)
+            PlateTracker.Read(plate, reading.text, confidences, detection.box, crop, location)
         }
     }
 
