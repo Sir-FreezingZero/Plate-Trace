@@ -1,7 +1,11 @@
 package com.example.platescanner.ui
 
 import android.text.format.DateUtils
+import android.Manifest
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -40,6 +44,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -59,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -77,6 +84,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.platescanner.PlateViewModel
+import com.example.platescanner.WatchAlerts
 import com.example.platescanner.data.PlateEntity
 import com.example.platescanner.data.SightingEntity
 import com.example.platescanner.scan.PlateTextFilter
@@ -88,7 +96,9 @@ import java.util.Locale
 
 private val DotColor = Color(0xFF6B6F76)
 
-private enum class SortMode(val label: String) { Recent("Recent"), MostSeen("Most seen") }
+private enum class SortMode(val label: String) {
+    Recent("Recent"), MostSeen("Most seen"), Watched("Watched")
+}
 
 private sealed interface Entry {
     data class Day(val label: String, val isToday: Boolean) : Entry
@@ -109,6 +119,18 @@ fun PlatesPage(
     onClose: () -> Unit,
 ) {
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val context = LocalContext.current
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* alerts still vibrate and show in-app if denied */ }
+
+    val toggleWatch: (PlateEntity) -> Unit = { plate ->
+        val turningOn = !plate.watched
+        if (turningOn && Build.VERSION.SDK_INT >= 33 && !WatchAlerts.canNotify(context)) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.setWatched(plate.id, turningOn)
+    }
 
     FullPage(visible = visible) {
         AnimatedContent(
@@ -122,6 +144,7 @@ fun PlatesPage(
                     recording = recording,
                     recordingSince = recordingSince,
                     onSelect = { selectedId = it.id },
+                    onToggleWatch = toggleWatch,
                     onBack = onClose,
                 )
             } else {
@@ -130,6 +153,7 @@ fun PlatesPage(
                     recording = recording,
                     recordingSince = recordingSince,
                     viewModel = viewModel,
+                    onToggleWatch = toggleWatch,
                     onBack = { selectedId = null },
                 )
             }
@@ -150,6 +174,7 @@ private fun PlateTimeline(
     recording: Boolean,
     recordingSince: Long,
     onSelect: (PlateEntity) -> Unit,
+    onToggleWatch: (PlateEntity) -> Unit,
     onBack: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -159,9 +184,10 @@ private fun PlateTimeline(
     val needle = PlateTextFilter.normalize(query)
     val filtered = if (needle.isEmpty()) plates else plates.filter { needle in it.plateNumber }
     val entries: List<Entry> = when (sort) {
-        SortMode.Recent -> buildList {
+        SortMode.Recent, SortMode.Watched -> buildList {
             var lastDay: String? = null
-            for (p in filtered) { // already newest first
+            val list = if (sort == SortMode.Watched) filtered.filter { it.watched } else filtered
+            for (p in list) { // already newest first
                 val (label, today) = dayLabel(p.lastSeen)
                 if (label != lastDay) {
                     lastDay = label
@@ -216,6 +242,10 @@ private fun PlateTimeline(
                 "No plates yet",
                 "Start recording and point the camera at a vehicle, or scan a photo.",
             )
+            entries.isEmpty() && sort == SortMode.Watched && needle.isEmpty() -> EmptyState(
+                "No watched plates",
+                "Tap the bell on a plate to get an alert whenever it's seen again.",
+            )
             entries.isEmpty() -> EmptyState("No matches", "No saved plate contains \"$needle\".")
             else -> LazyColumn(
                 contentPadding = PaddingValues(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
@@ -235,6 +265,7 @@ private fun PlateTimeline(
                             lineAbove = above,
                             lineBelow = below,
                             onClick = { onSelect(e.plate) },
+                            onToggleWatch = { onToggleWatch(e.plate) },
                         )
                     }
                 }
@@ -243,7 +274,7 @@ private fun PlateTimeline(
     }
 }
 
-private enum class Dot { Small, Highlight, Ring, RingAccent }
+private enum class Dot { Small, Highlight, Watched, Ring, RingAccent }
 
 /** Vertical timeline line with a dot centred on the row. */
 @Composable
@@ -258,6 +289,7 @@ private fun TimelineGutter(dot: Dot, lineAbove: Boolean, lineBelow: Boolean) {
         when (dot) {
             Dot.Small -> drawCircle(DotColor, 4.dp.toPx(), c)
             Dot.Highlight -> drawCircle(Accent, 5.dp.toPx(), c)
+            Dot.Watched -> drawCircle(WatchAmber, 5.dp.toPx(), c)
             Dot.Ring, Dot.RingAccent -> {
                 drawCircle(PageColor, 6.dp.toPx(), c)
                 drawCircle(
@@ -294,6 +326,7 @@ private fun PlateRow(
     lineAbove: Boolean,
     lineBelow: Boolean,
     onClick: () -> Unit,
+    onToggleWatch: () -> Unit,
 ) {
     Row(
         Modifier
@@ -302,7 +335,15 @@ private fun PlateRow(
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TimelineGutter(if (highlight) Dot.Highlight else Dot.Small, lineAbove, lineBelow)
+        TimelineGutter(
+            when {
+                plate.watched -> Dot.Watched
+                highlight -> Dot.Highlight
+                else -> Dot.Small
+            },
+            lineAbove,
+            lineBelow,
+        )
         AsyncImage(
             model = File(plate.latestVehicleImagePath ?: plate.latestImagePath),
             contentDescription = null,
@@ -330,11 +371,25 @@ private fun PlateRow(
                 maxLines = 1,
             )
         }
+        WatchButton(watched = plate.watched, onClick = onToggleWatch)
         Icon(
             Icons.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = Muted,
             modifier = Modifier.padding(end = 8.dp).size(20.dp),
+        )
+    }
+}
+
+/** Bell: filled amber when the plate is on the watch list. */
+@Composable
+private fun WatchButton(watched: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(
+            if (watched) Icons.Filled.Notifications else Icons.Outlined.Notifications,
+            contentDescription = if (watched) "Stop watching" else "Watch this plate",
+            tint = if (watched) WatchAmber else Muted.copy(alpha = 0.45f),
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -413,6 +468,7 @@ private fun PlateDetail(
     recording: Boolean,
     recordingSince: Long,
     viewModel: PlateViewModel,
+    onToggleWatch: (PlateEntity) -> Unit,
     onBack: () -> Unit,
 ) {
     val plateFlow = remember(plateId) { viewModel.plate(plateId) }
@@ -440,6 +496,7 @@ private fun PlateDetail(
                 plate?.let { PlateBadge(it.plateNumber, fontSize = 18.sp) }
             }
             if (recording) RecordingIndicator(recordingSince)
+            plate?.let { p -> WatchButton(watched = p.watched, onClick = { onToggleWatch(p) }) }
             IconButton(onClick = { confirmDelete = true }) {
                 Icon(Icons.Filled.Delete, contentDescription = "Delete plate", tint = Muted)
             }

@@ -7,8 +7,15 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+/** Outcome of saving a sighting. */
+data class SaveResult(val isNew: Boolean, val watched: Boolean)
+
 @Dao
 abstract class PlateDao {
+
+    @Query("UPDATE plates SET watched = :watched WHERE id = :id")
+    abstract suspend fun setWatched(id: Long, watched: Boolean)
+
 
     @Query("SELECT * FROM plates ORDER BY lastSeen DESC")
     abstract fun observePlates(): Flow<List<PlateEntity>>
@@ -45,7 +52,7 @@ abstract class PlateDao {
 
     /**
      * Adds a sighting, creating the plate if needed.
-     * @return true if this was the first time the plate was seen.
+     * @return whether the plate is new and whether it's on the watch list.
      */
     @Transaction
     open suspend fun recordSighting(
@@ -54,7 +61,7 @@ abstract class PlateDao {
         timestamp: Long,
         imagePath: String,
         vehicleImagePath: String?,
-    ): Boolean {
+    ): SaveResult {
         val existing = findByNumber(number)
         val plateId: Long
         val isNew: Boolean
@@ -91,7 +98,7 @@ abstract class PlateDao {
                 rawText = rawText,
             )
         )
-        return isNew
+        return SaveResult(isNew = isNew, watched = existing?.watched == true)
     }
 
     @Query("DELETE FROM sightings")

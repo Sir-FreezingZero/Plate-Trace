@@ -16,11 +16,11 @@ The whole screen is the camera, with one row of controls along the bottom:
 
 | Control | What it does |
 |---|---|
-| ⚙ (bottom left) | Opens the Settings page: how soon the same plate is saved again, saved-data summary, delete all plates. Recording keeps running while it's open |
+| ⚙ (bottom left) | Opens the Settings page: plate format, how soon the same plate is saved again, car shot framing, saved-data summary, delete all plates. Recording keeps running while it's open |
 | Big round button (centre) | Start / stop recording. Plates are only captured while recording; a red timer shows at the top |
 | Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
 | Other bar buttons | Spare, not used yet |
-| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen), with search. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
+| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen, or only watched plates), with search. Tap a bell to watch a plate. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
 
 When a plate is saved its number flashes at the top (green = new plate, dark = seen before) and the ☰ button pulses.
 
@@ -34,14 +34,17 @@ When a plate is saved its number flashes at the top (green = new plate, dark = s
 
 Images are stored in the app's private storage (`files/plate_crops/`); the database is `plates.db`.
 
-### Tuning
-- **Your region's plate format:** add a regex to `REGION_PATTERNS` in `PlateTextFilter.kt`
-  (e.g. UK `^[A-Z]{2}[0-9]{2}[A-Z]{3}$`). This removes most false positives such as
-  phone numbers on vans or shop signs.
-- **Strictness / repeat timing:** constructor values in `PlateTracker.kt`
-  (`confirmFrames`, `confirmWindowMs`, `cooldownMs`).
+### Settings
+- **Plate format:** *US plates* (default: needs letters and numbers, so phone numbers are ignored), *Only specific formats* (tick formats such as ABC 1234 or 1ABC234, or add your own with L = letter, 0 = number, * = either; look-alike characters like 0/O and 8/B are corrected to fit), or *Any plate-like text*.
+- **Save the same plate again after:** how long a plate must be out of view before it's saved again.
+- **Car shot framing:** how far the car photo zooms out around the plate (3×–12× the plate lettering width), with a preview. The plate crop is unaffected.
+
+### Watch list
+Tap the bell on any plate (in the list or on its detail page) to watch it. When a watched plate is seen again the phone vibrates, an amber banner appears over everything, and a notification with the car photo is posted (Android 13+ asks for notification permission the first time). Use the **Watched** filter on the Plates page to see only watched plates.
+
+### Tuning in code
+- **Strictness / repeat timing:** `confirmFrames` and `confirmWindowMs` in `PlateTracker.kt`.
 - **Crop margin:** `padX` / `padY` in `cropAround()` in `scan/BitmapUtils.kt`.
-- **Vehicle shot size:** the `6.05f` (car width ÷ plate-text width) and `0.8f` (height ÷ width) in `cropVehicle()` in the same file.
 
 ## Limitations
 - This uses general-purpose OCR with plate rules, not a dedicated plate-detection model.

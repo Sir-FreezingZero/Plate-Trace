@@ -20,8 +20,8 @@ class PlateRepository(context: Context) {
 
     fun sightings(plateId: Long): Flow<List<SightingEntity>> = dao.observeSightings(plateId)
 
-    /** @return true if the plate had never been seen before. */
-    suspend fun save(plateNumber: String, rawText: String, crop: Bitmap, vehicle: Bitmap): Boolean =
+    /** @return whether the plate is new and whether it's on the watch list. */
+    suspend fun save(plateNumber: String, rawText: String, crop: Bitmap, vehicle: Bitmap): SaveResult =
         withContext(Dispatchers.IO) {
             val timestamp = System.currentTimeMillis()
             val plateFile = File(imageDir, "${plateNumber}_$timestamp.jpg")
@@ -35,6 +35,10 @@ class PlateRepository(context: Context) {
         val paths = dao.imagePathsFor(plateId) + dao.vehicleImagePathsFor(plateId)
         dao.deletePlate(plateId)
         paths.forEach { File(it).delete() }
+    }
+
+    suspend fun setWatched(plateId: Long, watched: Boolean) = withContext(Dispatchers.IO) {
+        dao.setWatched(plateId, watched)
     }
 
     suspend fun deleteAll() = withContext(Dispatchers.IO) {

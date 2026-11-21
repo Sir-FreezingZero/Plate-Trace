@@ -31,6 +31,9 @@ class PlateAnalyzer(
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val tracker = PlateTracker()
 
+    /** Car shot width as a multiple of the plate text width (Settings). */
+    @Volatile var vehicleScale: Float = 6f
+
     /** Frames are only analysed while recording. */
     @Volatile var enabled: Boolean = false
 
@@ -80,7 +83,7 @@ class PlateAnalyzer(
         // ML Kit boxes are in upright coordinates, so rotate the frame to match before cropping.
         val frame = imageProxy.toBitmap().rotated(rotation)
         for (c in confirmed) {
-            onPlate(PlateDetection(c.plate, c.rawText, frame.cropAround(c.box), frame.cropVehicle(c.box)))
+            onPlate(PlateDetection(c.plate, c.rawText, frame.cropAround(c.box), frame.cropVehicle(c.box, vehicleScale)))
         }
     }
 
@@ -95,7 +98,7 @@ class PlateAnalyzer(
                 if (task.isSuccessful) {
                     PlateTextFilter.extract(task.result).map {
                         PlateDetection(
-                            it.plate, it.rawText, bitmap.cropAround(it.box), bitmap.cropVehicle(it.box)
+                            it.plate, it.rawText, bitmap.cropAround(it.box), bitmap.cropVehicle(it.box, vehicleScale)
                         )
                     }
                 } else {

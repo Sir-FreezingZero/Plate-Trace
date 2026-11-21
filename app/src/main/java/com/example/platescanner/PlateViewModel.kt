@@ -12,7 +12,11 @@ import com.example.platescanner.data.PlateRepository
 import com.example.platescanner.data.SightingEntity
 import com.example.platescanner.scan.PhotoLoader
 import com.example.platescanner.scan.PlateAnalyzer
+import com.example.platescanner.scan.FormatMode
 import com.example.platescanner.scan.PlateDetection
+import com.example.platescanner.scan.PlateRules
+import com.example.platescanner.scan.PlateTextFilter
+import com.example.platescanner.scan.PlateTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -29,7 +33,7 @@ import java.util.concurrent.Executors
 
 /** Short message shown on the camera screen. */
 data class Notice(val text: String, val kind: Kind) {
-    enum class Kind { NEW_PLATE, REPEAT_PLATE, INFO }
+    enum class Kind { NEW_PLATE, REPEAT_PLATE, WATCH, INFO }
 }
 
 class PlateViewModel(app: Application) : AndroidViewModel(app) {
@@ -53,6 +57,18 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _cooldownSeconds = MutableStateFlow(prefs.getInt(KEY_COOLDOWN, 15))
     val cooldownSeconds: StateFlow<Int> = _cooldownSeconds.asStateFlow()
 
+    private val _formatRules = MutableStateFlow(
+        PlateRules(
+            mode = runCatching { FormatMode.valueOf(prefs.getString(KEY_FORMAT_MODE, null) ?: "US") }
+                .getOrDefault(FormatMode.US),
+            masks = (prefs.getStringSet(KEY_FORMAT_MASKS, null) ?: DEFAULT_MASKS).sorted(),
+        )
+    )
+    val formatRules: StateFlow<PlateRules> = _formatRules.asStateFlow()
+
+    private val _vehicleScale = MutableStateFlow(prefs.getFloat(KEY_VEHICLE_SCALE, DEFAULT_VEHICLE_SCALE))
+    val vehicleScale: StateFlow<Float> = _vehicleScale.asStateFlow()
+
     /** Single background thread for frame analysis; outlives camera rebinds on rotation. */
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
@@ -60,6 +76,8 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         analyzer.cooldownMs = _cooldownSeconds.value * 1_000L
+        analyzer.vehicleScale = _vehicleScale.value
+        PlateTextFilter.rules = _formatRules.value
     }
 
     fun toggleRecording() {
@@ -92,9 +110,20 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             for (d in detections) {
                 try {
-                    val isNew = repository.save(d.plate, d.rawText, d.crop, d.vehicle)
-                    val kind = if (isNew) Notice.Kind.NEW_PLATE else Notice.Kind.REPEAT_PLATE
-                    _notices.tryEmit(Notice(d.plate, kind))
+                    val result = repository.save(d.plate, d.rawText, d.crop, d.vehicle)
+                    // Also alert for a reading that differs from a watched plate only by
+                    // look-alike characters (0/O, 8/B …).
+                    val folded = PlateTracker.fold(d.plate)
+                    val watched = result.watched || plates.value.any {
+                        it.watched && PlateTracker.fold(it.plateNumber) == folded
+                    }
+                    if (watched) {
+                        WatchAlerts.alert(getApplication<Application>(), d.plate, d.vehicle)
+                        _notices.tryEmit(Notice(d.plate, Notice.Kind.WATCH))
+                    } else {
+                        val kind = if (result.isNew) Notice.Kind.NEW_PLATE else Notice.Kind.REPEAT_PLATE
+                        _notices.tryEmit(Notice(d.plate, kind))
+                    }
                 } catch (t: Throwable) {
                     Log.e("PlateViewModel", "Could not save ${d.plate}", t)
                 }
@@ -106,6 +135,33 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putInt(KEY_COOLDOWN, seconds).apply()
         _cooldownSeconds.value = seconds
         analyzer.cooldownMs = seconds * 1_000L
+    }
+
+    fun setFormatMode(mode: FormatMode) = updateRules(_formatRules.value.copy(mode = mode))
+
+    fun setMaskEnabled(mask: String, enabled: Boolean) {
+        val masks = _formatRules.value.masks.toMutableSet()
+        if (enabled) masks.add(mask) else masks.remove(mask)
+        updateRules(_formatRules.value.copy(masks = masks.sorted()))
+    }
+
+    private fun updateRules(rules: PlateRules) {
+        prefs.edit()
+            .putString(KEY_FORMAT_MODE, rules.mode.name)
+            .putStringSet(KEY_FORMAT_MASKS, rules.masks.toSet())
+            .apply()
+        _formatRules.value = rules
+        PlateTextFilter.rules = rules
+    }
+
+    fun setVehicleScale(scale: Float) {
+        prefs.edit().putFloat(KEY_VEHICLE_SCALE, scale).apply()
+        _vehicleScale.value = scale
+        analyzer.vehicleScale = scale
+    }
+
+    fun setWatched(plateId: Long, watched: Boolean) {
+        viewModelScope.launch { repository.setWatched(plateId, watched) }
     }
 
     fun plate(id: Long): Flow<PlateEntity?> = repository.plate(id)
@@ -128,5 +184,10 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val KEY_COOLDOWN = "cooldown_seconds"
+        const val KEY_FORMAT_MODE = "format_mode"
+        const val KEY_FORMAT_MASKS = "format_masks"
+        const val KEY_VEHICLE_SCALE = "vehicle_scale"
+        const val DEFAULT_VEHICLE_SCALE = 6f
+        val DEFAULT_MASKS = setOf("LLL0000")
     }
 }

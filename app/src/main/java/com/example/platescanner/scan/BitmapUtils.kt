@@ -38,9 +38,12 @@ internal fun Bitmap.cropAround(box: Rect, padX: Float = 0.18f, padY: Float = 0.7
  * characters are roughly 1/6 of the width of a car's rear, and the plate sits in its
  * lower part. The box is slid (not shrunk) to stay inside the frame, and the result is
  * scaled down to at most [maxSide] px.
+ *
+ * @param widthFactor width of the car shot as a multiple of the plate text's width
+ * (Settings → Car shot framing). Larger = more zoomed out.
  */
-internal fun Bitmap.cropVehicle(textBox: Rect, maxSide: Int = 1280): Bitmap {
-    val w = (textBox.width() * 6.05f).toInt().coerceIn(1, width)
+internal fun Bitmap.cropVehicle(textBox: Rect, widthFactor: Float = 6f, maxSide: Int = 1280): Bitmap {
+    val w = (textBox.width() * widthFactor).toInt().coerceIn(1, width)
     val h = (w * 0.8f).toInt().coerceIn(1, height)
     val left = (textBox.centerX() - w / 2).coerceIn(0, width - w)
     val top = (textBox.centerY() - (h * 0.62f).toInt()).coerceIn(0, height - h)

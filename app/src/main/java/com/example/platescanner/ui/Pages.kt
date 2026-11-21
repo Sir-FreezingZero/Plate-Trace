@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 
 internal val Accent = Color(0xFF2ECC71)
 internal val RecordRed = Color(0xFFE53935)
+internal val WatchAmber = Color(0xFFFFB300)
 internal val ThumbBackground = Color(0xFF1E2126)
 internal val Muted = Color.White.copy(alpha = 0.6f)
 internal val PageColor = Color(0xFF0E0F11)

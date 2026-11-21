@@ -1,5 +1,6 @@
 package com.example.platescanner.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -20,6 +21,9 @@ data class PlateEntity(
     val latestImagePath: String,
     /** Wider shot of the back of the car from the latest sighting (null for older data). */
     val latestVehicleImagePath: String? = null,
+    /** On the watch list: alert when this plate is seen. */
+    @ColumnInfo(defaultValue = "0")
+    val watched: Boolean = false,
 )
 
 /** One row per time a plate was seen; each has its own cropped image. */

@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -82,6 +83,9 @@ fun ScannerScreen(viewModel: PlateViewModel) {
     var notice by remember { mutableStateOf<Notice?>(null) }
     var noticeVisible by remember { mutableStateOf(false) }
     var noticeCount by remember { mutableIntStateOf(0) }
+    var watchAlert by remember { mutableStateOf<Notice?>(null) }
+    var watchVisible by remember { mutableStateOf(false) }
+    var watchCount by remember { mutableIntStateOf(0) }
     val pulse = remember { Animatable(0f) }
 
     val pickPhoto = rememberLauncherForActivityResult(
@@ -91,6 +95,11 @@ fun ScannerScreen(viewModel: PlateViewModel) {
     // Each saved plate: pulse the menu button and flash the plate number at the top.
     LaunchedEffect(Unit) {
         viewModel.notices.collect { n ->
+            if (n.kind == Notice.Kind.WATCH) {
+                watchAlert = n
+                watchVisible = true
+                watchCount++
+            }
             notice = n
             noticeVisible = true
             noticeCount++
@@ -100,6 +109,12 @@ fun ScannerScreen(viewModel: PlateViewModel) {
                     pulse.animateTo(0f, tween(900))
                 }
             }
+        }
+    }
+    LaunchedEffect(watchCount) {
+        if (watchCount > 0) {
+            delay(6_000)
+            watchVisible = false
         }
     }
     LaunchedEffect(noticeCount) {
@@ -172,6 +187,41 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             viewModel = viewModel,
             onClose = { openPanel = OpenPanel.None },
         )
+
+        // Watch-list alert: drawn last so it shows above the camera and both pages.
+        AnimatedVisibility(
+            visible = watchVisible,
+            enter = fadeIn() + slideInVertically { -it },
+            exit = fadeOut() + slideOutVertically { -it },
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            WatchBanner(watchAlert, onDismiss = { watchVisible = false })
+        }
+    }
+}
+
+@Composable
+private fun WatchBanner(alert: Notice?, onDismiss: () -> Unit) {
+    if (alert == null) return
+    Row(
+        Modifier
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .shadow(12.dp, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(WatchAmber)
+            .clickable(onClick = onDismiss)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Notifications, contentDescription = null, tint = Color.Black)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("WATCHED PLATE SEEN", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text(alert.text, color = Color.Black, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        }
+        Text("Tap to dismiss", color = Color.Black.copy(alpha = 0.6f), fontSize = 11.sp)
     }
 }
 
@@ -368,7 +418,11 @@ private fun NoticeLabel(notice: Notice?) {
             .padding(top = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(
-                if (notice.kind == Notice.Kind.NEW_PLATE) Accent.copy(alpha = 0.85f) else Glass
+                when (notice.kind) {
+                    Notice.Kind.NEW_PLATE -> Accent.copy(alpha = 0.85f)
+                    Notice.Kind.WATCH -> WatchAmber.copy(alpha = 0.9f)
+                    else -> Glass
+                }
             )
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )
