@@ -132,8 +132,8 @@ private fun LiveBox.key(index: Int) = savedText ?: text ?: "box$index"
 /**
  * Plate box with two strips, as wide as the box and joined to it:
  * - top: the plate number read in this frame;
- * - bottom: "2/3" (matching readings so far / needed), or the saved text once saved, or why
- *   the reading was rejected.
+ * - bottom: status only: "2/3" (matching readings so far / needed), "saved", "unsure", or
+ *   "—" (not a plate format).
  * The whole marker turns green once the plate is saved (white while reading, amber rejected).
  */
 @Composable
@@ -145,10 +145,11 @@ private fun PlateMarker(b: LiveBox, r: Rect, alpha: Float) {
     val shape = RoundedCornerShape(5.dp)
 
     val top = b.text ?: "—"
+    // Bottom strip is status only, never the plate number.
     val bottom = when {
-        b.saved -> b.savedText ?: b.text ?: ""
+        b.saved -> "saved"
         b.accepted -> "${b.matches}/${b.needed}"
-        b.reason == "format" -> "not a plate"
+        b.reason == "format" -> "—" // not a plate format
         else -> "unsure"
     }
 
