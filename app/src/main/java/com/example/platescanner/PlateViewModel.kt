@@ -71,6 +71,9 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _vehicleScale = MutableStateFlow(loadVehicleScale())
     val vehicleScale: StateFlow<Float> = _vehicleScale.asStateFlow()
 
+    private val _agreeReads = MutableStateFlow(prefs.getInt(KEY_AGREE_READS, 3))
+    val agreeReads: StateFlow<Int> = _agreeReads.asStateFlow()
+
     private val _showLive = MutableStateFlow(prefs.getBoolean(KEY_SHOW_LIVE, false))
     val showLive: StateFlow<Boolean> = _showLive.asStateFlow()
 
@@ -88,6 +91,13 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         analyzer.vehicleScale = _vehicleScale.value
         PlateTextFilter.rules = _formatRules.value
         applyShowLive(_showLive.value)
+        analyzer.agreeReads = _agreeReads.value
+    }
+
+    fun setAgreeReads(count: Int) {
+        prefs.edit().putInt(KEY_AGREE_READS, count).apply()
+        _agreeReads.value = count
+        analyzer.agreeReads = count
     }
 
     fun setShowLive(show: Boolean) {
@@ -221,6 +231,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_COOLDOWN = "cooldown_seconds"
         const val KEY_FORMAT_MODE = "format_mode"
         const val KEY_SHOW_LIVE = "show_live_readings"
+        const val KEY_AGREE_READS = "agree_reads"
         const val KEY_FORMAT_MASKS = "format_masks"
         /** v2: multiple of the detected plate's width (v1 was of the text width). */
         const val KEY_VEHICLE_SCALE = "vehicle_scale_v2"

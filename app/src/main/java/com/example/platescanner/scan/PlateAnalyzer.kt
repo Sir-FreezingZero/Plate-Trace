@@ -67,6 +67,10 @@ class PlateAnalyzer(
         get() = tracker.cooldownMs
         set(value) { tracker.cooldownMs = value }
 
+    var agreeReads: Int
+        get() = tracker.agreeReads
+        set(value) { tracker.agreeReads = value }
+
     /** Optional: receives what was read in each frame (Settings → Show live readings). */
     @Volatile var onFrameInfo: ((FrameInfo) -> Unit)? = null
 

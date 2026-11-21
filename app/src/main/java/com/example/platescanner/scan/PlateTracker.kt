@@ -33,13 +33,15 @@ import kotlin.math.sqrt
  * Methods are synchronized: frames arrive on the analysis thread, [flush] on the main thread.
  */
 class PlateTracker(
-    private val agreeReads: Int = 3,
     private val minReads: Int = 2,
     private val settleMs: Long = 1_200,
     private val maxWaitMs: Long = 3_000,
 ) {
     /** Changed from Settings. */
     @Volatile var cooldownMs: Long = 15_000
+
+    /** Matching reads needed to save while in view (Settings). */
+    @Volatile var agreeReads: Int = 3
 
     /** One plate read in one frame. */
     class Read(
