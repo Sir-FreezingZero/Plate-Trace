@@ -12,12 +12,17 @@ of each one, and keeps a browsable history.
 Everything runs offline: the text-recognition model is bundled in the APK.
 
 ## Using it
-- The whole screen is the camera. Point it at vehicles; plates are captured automatically.
-- The round bubble (top right) shows how many plates are stored and pulses when one is saved.
-  Under it, the plate number flashes briefly: green for a new plate, dark for a repeat.
-- Tap the bubble to slide out the list (newest first, with search). Tap a plate to see every
-  saved image and when it was seen. Tap an image to view it full screen. The trash icon
-  deletes a plate and its images.
+The whole screen is the camera, with one row of controls along the bottom:
+
+| Control | What it does |
+|---|---|
+| ⚙ (bottom left) | Settings: how soon the same plate is saved again, delete all plates |
+| Big round button (centre) | Start / stop recording. Plates are only captured while recording; a red timer shows at the top |
+| Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
+| Other bar buttons | Spare, not used yet |
+| ☰ (bottom right) | Slide-out list of saved plates (newest first, with search). Tap one for all its images and detection history; tap an image for full screen; the trash icon deletes it |
+
+When a plate is saved its number flashes at the top (green = new plate, dark = seen before) and the ☰ button pulses.
 
 ## How detection works
 | Step | Where |

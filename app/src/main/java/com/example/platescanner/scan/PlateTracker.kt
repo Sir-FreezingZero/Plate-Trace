@@ -6,7 +6,7 @@ package com.example.platescanner.scan
  * - A plate must be read identically in [confirmFrames] frames within [confirmWindowMs]
  *   before it is recorded. This filters out one-off OCR misreads.
  * - While a plate stays in view it is not recorded again. A new sighting is recorded only
- *   after it has been out of view for at least [cooldownMs].
+ *   after it has been out of view for at least [cooldownMs] (set in Settings).
  *
  * Not thread-safe; CameraX delivers frames one at a time (each is closed before the next
  * arrives), so calls are sequential.
@@ -14,8 +14,10 @@ package com.example.platescanner.scan
 class PlateTracker(
     private val confirmFrames: Int = 2,
     private val confirmWindowMs: Long = 2_000,
-    private val cooldownMs: Long = 15_000,
 ) {
+    /** Changed from Settings; read on the analysis thread. */
+    @Volatile var cooldownMs: Long = 15_000
+
     private class Pending(var count: Int, val firstAt: Long)
 
     private val pending = HashMap<String, Pending>()

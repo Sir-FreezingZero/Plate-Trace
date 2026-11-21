@@ -1,8 +1,6 @@
 package com.example.platescanner.scan
 
 import android.graphics.Bitmap
-import android.graphics.Matrix
-import android.graphics.Rect
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.OptIn
@@ -28,12 +26,23 @@ class PlateAnalyzer(
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val tracker = PlateTracker()
 
+    /** Frames are only analysed while recording. */
+    @Volatile var enabled: Boolean = false
+
+    var cooldownMs: Long
+        get() = tracker.cooldownMs
+        set(value) { tracker.cooldownMs = value }
+
     // Run ML Kit callbacks on the thread that completes the task, so we can still use the
     // ImageProxy (it must be closed only after we've cropped from it).
     private val direct = Executor { it.run() }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
+        if (!enabled) {
+            imageProxy.close()
+            return
+        }
         val mediaImage = imageProxy.image
         if (mediaImage == null) {
             imageProxy.close()
@@ -67,6 +76,30 @@ class PlateAnalyzer(
         }
     }
 
+    /**
+     * Scans a single still image (e.g. a photo picked from the gallery). Every plate found is
+     * returned straight away; the multi-frame confirmation and cooldown don't apply.
+     * [onResult] runs on a background thread.
+     */
+    fun scanStill(bitmap: Bitmap, onResult: (List<PlateDetection>) -> Unit) {
+        recognizer.process(InputImage.fromBitmap(bitmap, 0)).addOnCompleteListener(direct) { task ->
+            val detections = try {
+                if (task.isSuccessful) {
+                    PlateTextFilter.extract(task.result).map {
+                        PlateDetection(it.plate, it.rawText, bitmap.cropAround(it.box))
+                    }
+                } else {
+                    Log.w(TAG, "Text recognition failed", task.exception)
+                    emptyList()
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Still scan failed", t)
+                emptyList()
+            }
+            onResult(detections)
+        }
+    }
+
     fun close() = recognizer.close()
 
     private companion object {
@@ -74,22 +107,3 @@ class PlateAnalyzer(
     }
 }
 
-private fun Bitmap.rotated(degrees: Int): Bitmap {
-    if (degrees % 360 == 0) return this
-    val m = Matrix().apply { postRotate(degrees.toFloat()) }
-    return Bitmap.createBitmap(this, 0, 0, width, height, m, true)
-}
-
-/**
- * Crops the text box plus a margin, so the saved image shows the whole plate rather than
- * just the characters.
- */
-private fun Bitmap.cropAround(box: Rect, padX: Float = 0.18f, padY: Float = 0.7f): Bitmap {
-    val dx = (box.width() * padX).toInt()
-    val dy = (box.height() * padY).toInt()
-    val left = (box.left - dx).coerceIn(0, width - 1)
-    val top = (box.top - dy).coerceIn(0, height - 1)
-    val right = (box.right + dx).coerceIn(left + 1, width)
-    val bottom = (box.bottom + dy).coerceIn(top + 1, height)
-    return Bitmap.createBitmap(this, left, top, right - left, bottom - top)
-}

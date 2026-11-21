@@ -34,4 +34,9 @@ class PlateRepository(context: Context) {
         dao.deletePlate(plateId)
         paths.forEach { File(it).delete() }
     }
+
+    suspend fun deleteAll() = withContext(Dispatchers.IO) {
+        dao.deleteEverything()
+        imageDir.listFiles()?.forEach { it.delete() }
+    }
 }

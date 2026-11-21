@@ -87,6 +87,18 @@ abstract class PlateDao {
         return isNew
     }
 
+    @Query("DELETE FROM sightings")
+    abstract suspend fun deleteAllSightings()
+
+    @Query("DELETE FROM plates")
+    abstract suspend fun deleteAllPlates()
+
+    @Transaction
+    open suspend fun deleteEverything() {
+        deleteAllSightings()
+        deleteAllPlates()
+    }
+
     @Transaction
     open suspend fun deletePlate(id: Long) {
         deleteSightingsFor(id)

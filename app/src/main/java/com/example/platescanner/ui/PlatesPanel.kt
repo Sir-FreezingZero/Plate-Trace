@@ -75,9 +75,6 @@ import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
-private val PanelColor = Color(0xF2121417)
-private val ThumbBackground = Color(0xFF1E2126)
-private val Muted = Color.White.copy(alpha = 0.6f)
 
 /** Right-hand slide-out panel shown over the camera. */
 @Composable
@@ -88,57 +85,24 @@ fun PlatesPanel(
     onDismiss: () -> Unit,
 ) {
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-    val panelWidth = minOf(screenWidth * 0.88f, 420.dp)
-
-    Box(Modifier.fillMaxSize()) {
-        // Scrim: tap outside the panel to close it.
-        AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss,
-                    )
-            )
-        }
-
-        AnimatedVisibility(
-            visible = visible,
-            enter = slideInHorizontally { it },
-            exit = slideOutHorizontally { it },
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            Surface(
-                modifier = Modifier.width(panelWidth).fillMaxHeight(),
-                shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
-                color = PanelColor,
-                contentColor = Color.White,
-            ) {
-                Column(Modifier.statusBarsPadding().navigationBarsPadding()) {
-                    AnimatedContent(
-                        targetState = selectedId,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "panel",
-                    ) { id ->
-                        if (id == null) {
-                            PlateList(
-                                plates = plates,
-                                onSelect = { selectedId = it.id },
-                                onClose = onDismiss,
-                            )
-                        } else {
-                            PlateDetail(
-                                plateId = id,
-                                viewModel = viewModel,
-                                onBack = { selectedId = null },
-                            )
-                        }
-                    }
-                }
+    SidePanel(visible = visible, fromStart = false, onDismiss = onDismiss) {
+        AnimatedContent(
+            targetState = selectedId,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "panel",
+        ) { id ->
+            if (id == null) {
+                PlateList(
+                    plates = plates,
+                    onSelect = { selectedId = it.id },
+                    onClose = onDismiss,
+                )
+            } else {
+                PlateDetail(
+                    plateId = id,
+                    viewModel = viewModel,
+                    onBack = { selectedId = null },
+                )
             }
         }
     }
