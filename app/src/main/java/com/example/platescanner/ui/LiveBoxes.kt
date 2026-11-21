@@ -23,6 +23,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,57 +100,67 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
 
 /**
  * The plate box with a header strip joined to its top edge, exactly as wide as the box, holding
- * the reading centred. The text shrinks to fit so it never runs past the box.
+ * the reading centred. The strip is as tall as its text, and the text measures itself and
+ * shrinks until it fits the box width.
  */
 @Composable
-private fun PlateMarker(b: LiveBox, r: Rect, viewW: Float) {
+private fun PlateMarker(b: LiveBox, r: Rect, @Suppress("UNUSED_PARAMETER") viewW: Float) {
     val density = LocalDensity.current
     val color = b.color()
-    val headerH = 15.dp
-    val headerPx = with(density) { headerH.toPx() }
-    val stroke = 1.5.dp
-    val shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 2.dp, bottomEnd = 2.dp)
+    val widthPx = r.width.roundToInt().coerceAtLeast(1)
+    val boxHeight = with(density) { r.height.toDp() }
+    val shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 3.dp, bottomEnd = 3.dp)
 
-    val label = (b.savedText ?: b.text ?: "?") + " " + tagStatus(b)
-    // Monospace glyphs are ~0.6 em wide: size the text so the whole label fits the box width.
-    val boxWidthPx = r.width
-    val fitPx = (boxWidthPx - with(density) { 6.dp.toPx() }) / (label.length * 0.6f)
-    val fontSp = with(density) { fitPx.toSp() }.value.coerceIn(7f, 12f).sp
+    val label = buildAnnotatedString {
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(b.savedText ?: b.text ?: "?") }
+        withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color.Black.copy(alpha = 0.65f))) {
+            append("  " + tagStatus(b))
+        }
+    }
+    // Start at 12sp and step down until the label fits on one line inside the box.
+    // Re-fit only when the text changes or the width changes noticeably (not every animation frame).
+    var fontSize by remember(label.text, widthPx / 24) { mutableStateOf(12.sp) }
 
     Column(
         Modifier
-            .offset { IntOffset(r.left.roundToInt(), (r.top - headerPx).roundToInt()) }
-            .size(with(density) { r.width.toDp() }, with(density) { (r.height + headerPx).toDp() })
-            .border(stroke + 1.dp, Color.Black.copy(alpha = 0.3f), shape) // contrast on bright scenes
-            .border(stroke, color, shape)
+            .layout { measurable, _ ->
+                val p = measurable.measure(Constraints.fixedWidth(widthPx))
+                layout(0, 0) {
+                    // Bottom of the column = bottom of the plate box; the header sits above it.
+                    p.place(r.left.roundToInt(), r.bottom.roundToInt() - p.height)
+                }
+            }
+            .border(2.5.dp, Color.Black.copy(alpha = 0.25f), shape) // contrast on bright scenes
+            .border(1.5.dp, color, shape)
             .clip(shape),
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(headerH)
-                .background(color),
+                .background(color)
+                .padding(horizontal = 3.dp, vertical = 2.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 label,
                 color = Color.Black,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = fontSp,
+                fontSize = fontSize,
+                lineHeight = fontSize * 1.1f,
                 maxLines = 1,
                 softWrap = false,
-                overflow = TextOverflow.Clip,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 3.dp),
+                onTextLayout = { result ->
+                    if (result.didOverflowWidth && fontSize.value > 6f) fontSize = (fontSize.value - 1f).sp
+                },
             )
         }
+        Spacer(Modifier.height(boxHeight))
     }
 }
 
-/** Small status after the plate number: "2/3", "✓", "?" (unsure), "✕" (not a plate format). */
+/** Small status after the plate number: "2/3", "saved", "?" (unsure), "✕" (not a plate format). */
 private fun tagStatus(b: LiveBox): String = when {
-    b.saved -> "✓"
+    b.saved -> "saved"
     b.accepted -> "${b.matches}/${b.needed}"
     b.reason == "format" -> "✕"
     else -> "?"
