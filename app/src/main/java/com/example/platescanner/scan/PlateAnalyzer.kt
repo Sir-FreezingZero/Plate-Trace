@@ -17,7 +17,7 @@ class PlateDetection(
 )
 
 /** One detected plate in a frame, for the optional live view. */
-class LiveBox(
+data class LiveBox(
     /** In upright frame pixels. */
     val box: Rect,
     /** What was read, or null if nothing readable. */
@@ -25,6 +25,14 @@ class LiveBox(
     val confidence: Float,
     /** True if the reading passed the confidence and plate-format checks. */
     val accepted: Boolean,
+    /** Why it was rejected, when not accepted. */
+    val reason: String? = null,
+    /** Matching reads so far / needed to save (accepted plates only). */
+    val matches: Int = 0,
+    val needed: Int = 0,
+    /** True once this plate has been saved; [savedText] is what it was saved as. */
+    val saved: Boolean = false,
+    val savedText: String? = null,
 )
 
 /** What the reader saw in the latest frame, for Settings → Show live readings. */
@@ -114,12 +122,18 @@ class PlateAnalyzer(
             val live = if (listener != null) ArrayList<LiveBox>() else null
             val reads = findAndRead(frame, live)
             val now = SystemClock.elapsedRealtime()
-            if (listener != null && live != null) {
-                listener(FrameInfo(frame.width, frame.height, now - start, live))
-            }
             // Every frame goes to the tracker, even with no reads, so it notices plates leaving.
             val scale = vehicleScale
             tracker.onFrame(now, reads) { box -> frame.cropVehicle(box, scale) }.forEach { emit(it) }
+            if (listener != null && live != null) {
+                val withStatus = live.map { b ->
+                    if (!b.accepted || b.text == null) b
+                    else tracker.status(b.text).let { st ->
+                        b.copy(matches = st.matches, needed = st.needed, saved = st.saved, savedText = st.savedText)
+                    }
+                }
+                listener(FrameInfo(frame.width, frame.height, now - start, withStatus))
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "Plate processing failed", t)
         }
@@ -147,11 +161,16 @@ class PlateAnalyzer(
             val reading = models.read(crop)
             val text = reading.text.ifEmpty { null }
             if (reading.text.length < 2 || reading.minConfidence < MIN_CHAR_CONFIDENCE) {
-                live?.add(LiveBox(detection.box, text, reading.minConfidence, accepted = false))
+                live?.add(LiveBox(detection.box, text, reading.minConfidence, accepted = false, reason = "unsure"))
                 return@mapNotNull null
             }
             val plate = PlateTextFilter.accept(PlateTextFilter.normalize(reading.text))
-            live?.add(LiveBox(detection.box, plate ?: text, reading.minConfidence, accepted = plate != null))
+            live?.add(
+                LiveBox(
+                    detection.box, plate ?: text, reading.minConfidence, accepted = plate != null,
+                    reason = if (plate == null) "format" else null,
+                )
+            )
             if (plate == null) return@mapNotNull null
             // accept() may correct look-alike characters but never changes the length, so the
             // confidences still line up with the characters.

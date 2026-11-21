@@ -62,6 +62,7 @@ class PlateTracker(
         /** For each distinct text read: its largest crop and the car shot from that frame. */
         val bestByText = HashMap<String, Pair<Read, Bitmap>>()
         var committed = false
+        var savedText: String? = null
         val lastTexts = ArrayList<String>()
         var lastBox = Rect()
     }
@@ -98,6 +99,18 @@ class PlateTracker(
             }
         }
         return collect(now, force = false)
+    }
+
+    /** Where a plate reading stands, for the live view. */
+    class Status(val saved: Boolean, val savedText: String?, val matches: Int, val needed: Int)
+
+    /** Status of the track that [text] (just read) belongs to. */
+    @Synchronized
+    fun status(text: String): Status {
+        val t = tracks.filter { tr -> tr.lastTexts.any { similar(it, text) } }.maxByOrNull { it.lastAt }
+            ?: return Status(false, null, 0, agreeReads)
+        if (t.committed) return Status(true, t.savedText, agreeReads, agreeReads)
+        return Status(false, null, t.reads.count { it.text == text }, agreeReads)
     }
 
     /** Saves whatever is pending (e.g. when recording stops). */
@@ -138,6 +151,7 @@ class PlateTracker(
             val (read, vehicle) = t.bestByText[plate] ?: largest
             out.add(Result(plate, read.rawText, read.crop, vehicle))
             t.committed = true
+            t.savedText = plate
             t.reads.clear() // free bitmaps; from here on the track only keeps the plate "in view"
             t.bestByText.clear()
         }

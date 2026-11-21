@@ -144,7 +144,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (recording) RecordingIndicator(recordingSince)
-            liveInfo?.let { LiveReadout(it) }
+            liveInfo?.let { LiveStats(it) }
             AnimatedVisibility(
                 visible = noticeVisible,
                 enter = fadeIn() + slideInVertically { -it / 2 },
@@ -199,37 +199,6 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             WatchBanner(watchAlert, onDismiss = { watchVisible = false })
-        }
-    }
-}
-
-/** Settings → Show live readings: what the reader saw in the latest frame. */
-@Composable
-private fun LiveReadout(info: com.example.platescanner.scan.FrameInfo) {
-    Column(
-        Modifier
-            .padding(top = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black.copy(alpha = 0.65f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-    ) {
-        Text(
-            "${info.width}×${info.height} · ${info.millis} ms",
-            color = Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
-        )
-        if (info.boxes.isEmpty()) {
-            Text("no plate", color = Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-        }
-        info.boxes.forEach { b ->
-            Text(
-                "%-9s %3d%%  %dpx%s".format(
-                    b.text ?: "?", (b.confidence * 100).toInt(), b.box.width(),
-                    if (b.accepted) "" else "  ✕",
-                ),
-                color = if (b.accepted) Color.White else WatchAmber,
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-            )
         }
     }
 }
