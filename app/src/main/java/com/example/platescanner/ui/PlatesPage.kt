@@ -54,6 +54,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.example.platescanner.R
+import androidx.compose.ui.res.painterResource
 import com.example.platescanner.data.WatchEntity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.input.ImeAction
@@ -237,7 +239,7 @@ private fun PlateTimeline(
             onBack = onBack,
         ) {
             IconButton(onClick = { adding = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Watch for a plate")
+                Icon(painterResource(R.drawable.ic_eye), contentDescription = "Watch for a plate")
             }
             IconButton(onClick = {
                 searching = !searching
@@ -285,11 +287,11 @@ private fun PlateTimeline(
             plates.isEmpty() && !showWaiting -> EmptyState(
                 "No plates yet",
                 "Start recording and point the camera at a vehicle, or scan a photo. " +
-                    "Tap + to get an alert for a plate you haven't seen yet.",
+                    "Tap the eye icon to get an alert for a plate you haven't seen yet.",
             )
             entries.isEmpty() && !showWaiting && sort == SortMode.Watched && needle.isEmpty() -> EmptyState(
                 "No watched plates",
-                "Tap the bell on a plate, or + to watch for a plate you haven't seen yet.",
+                "Tap the bell on a plate, or the eye icon to watch for a plate you haven't seen yet.",
             )
             entries.isEmpty() && !showWaiting ->
                 EmptyState("No matches", "No saved plate contains \"$needle\".")
