@@ -21,6 +21,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.Icons
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -74,6 +81,21 @@ private fun LiveBox.color(): Color = when {
  */
 @Composable
 fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
+    // Boxes currently on screen, by key. A box missing from the latest frame stays briefly and
+    // fades out, so a plate the detector misses for one frame doesn't blink.
+    val shown = remember { mutableStateMapOf<String, Pair<LiveBox, Boolean>>() }
+    LaunchedEffect(info) {
+        val present = HashSet<String>()
+        info.boxes.forEachIndexed { i, b ->
+            val k = b.key(i)
+            present.add(k)
+            shown[k] = b to true
+        }
+        for (k in shown.keys.toList()) {
+            if (k !in present) shown[k]?.let { (b, _) -> shown[k] = b to false }
+        }
+    }
+
     BoxWithConstraints(modifier) {
         if (info.width <= 0 || info.height <= 0) return@BoxWithConstraints
         val viewW = constraints.maxWidth.toFloat()
@@ -81,10 +103,11 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
         val scale = max(viewW / info.width, viewH / info.height)
         val offX = (viewW - info.width * scale) / 2f
         val offY = (viewH - info.height * scale) / 2f
-        val padPx = with(LocalDensity.current) { 2.dp.toPx() }
+        val padPx = with(LocalDensity.current) { 3.dp.toPx() }
 
-        info.boxes.forEachIndexed { i, b ->
-            key(b.savedText ?: b.text ?: "box$i") {
+        shown.entries.toList().forEach { (k, entry) ->
+            val (b, visible) = entry
+            key(k) {
                 val target = Rect(
                     offX + b.box.left * scale - padPx,
                     offY + b.box.top * scale - padPx,
@@ -92,34 +115,51 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
                     offY + b.box.bottom * scale + padPx,
                 )
                 val rect by animateRectAsState(target, tween(150), label = "plateBox")
-                PlateMarker(b, rect, viewW)
+                val alpha by animateFloatAsState(
+                    targetValue = if (visible) 1f else 0f,
+                    animationSpec = tween(if (visible) 120 else 450),
+                    label = "plateFade",
+                    finishedListener = { if (it == 0f) shown.remove(k) },
+                )
+                PlateMarker(b, rect, alpha)
             }
         }
     }
 }
 
+private fun LiveBox.key(index: Int) = savedText ?: text ?: "box$index"
+
 /**
- * The plate box with a header strip joined to its top edge, exactly as wide as the box, holding
- * the reading centred. The strip is as tall as its text, and the text measures itself and
- * shrinks until it fits the box width.
+ * The plate box with a header strip joined to its top edge, exactly as wide as the box:
+ * the plate number centred (shrunk to fit), a ✓ once saved or ?/✕ when rejected, and a thin
+ * bar along the bottom of the header that fills as matching readings come in.
  */
 @Composable
-private fun PlateMarker(b: LiveBox, r: Rect, @Suppress("UNUSED_PARAMETER") viewW: Float) {
+private fun PlateMarker(b: LiveBox, r: Rect, alpha: Float) {
     val density = LocalDensity.current
     val color = b.color()
     val widthPx = r.width.roundToInt().coerceAtLeast(1)
     val boxHeight = with(density) { r.height.toDp() }
-    val shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 3.dp, bottomEnd = 3.dp)
+    val shape = RoundedCornerShape(5.dp)
+    val ink = Color.Black.copy(alpha = 0.85f)
 
     val label = buildAnnotatedString {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(b.savedText ?: b.text ?: "?") }
-        withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color.Black.copy(alpha = 0.65f))) {
-            append("  " + tagStatus(b))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)) {
+            append(b.savedText ?: b.text ?: "· · ·")
+        }
+        if (!b.accepted) {
+            withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color.Black.copy(alpha = 0.55f))) {
+                append(if (b.reason == "format") " ✕" else " ?")
+            }
         }
     }
-    // Start at 12sp and step down until the label fits on one line inside the box.
-    // Re-fit only when the text changes or the width changes noticeably (not every animation frame).
-    var fontSize by remember(label.text, widthPx / 24) { mutableStateOf(12.sp) }
+    // Start at 13sp and step down until it fits; re-fit only when the text or width really change.
+    var fontSize by remember(label.text, b.saved, widthPx / 24) { mutableStateOf(13.sp) }
+    val progress = when {
+        b.saved -> 1f
+        b.accepted && b.needed > 0 -> (b.matches.toFloat() / b.needed).coerceIn(0f, 1f)
+        else -> 0f
+    }
 
     Column(
         Modifier
@@ -130,29 +170,53 @@ private fun PlateMarker(b: LiveBox, r: Rect, @Suppress("UNUSED_PARAMETER") viewW
                     p.place(r.left.roundToInt(), r.bottom.roundToInt() - p.height)
                 }
             }
-            .border(2.5.dp, Color.Black.copy(alpha = 0.25f), shape) // contrast on bright scenes
+            .alpha(alpha)
+            .border(3.dp, Color.Black.copy(alpha = 0.22f), shape) // soft contrast edge
             .border(1.5.dp, color, shape)
-            .clip(shape),
+            .clip(shape)
+            .background(color.copy(alpha = 0.08f)),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(color)
-                .padding(horizontal = 3.dp, vertical = 2.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                label,
-                color = Color.Black,
-                fontSize = fontSize,
-                lineHeight = fontSize * 1.1f,
-                maxLines = 1,
-                softWrap = false,
-                textAlign = TextAlign.Center,
-                onTextLayout = { result ->
-                    if (result.didOverflowWidth && fontSize.value > 6f) fontSize = (fontSize.value - 1f).sp
-                },
-            )
+        Column(Modifier.fillMaxWidth().background(color)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (b.saved) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = "Saved",
+                        tint = ink,
+                        modifier = Modifier.size(with(density) { fontSize.toDp() }),
+                    )
+                    Spacer(Modifier.width(2.dp))
+                }
+                Text(
+                    label,
+                    color = ink,
+                    fontSize = fontSize,
+                    lineHeight = fontSize * 1.1f,
+                    maxLines = 1,
+                    softWrap = false,
+                    textAlign = TextAlign.Center,
+                    onTextLayout = { result ->
+                        if (result.didOverflowWidth && fontSize.value > 6f) {
+                            fontSize = (fontSize.value - 1f).sp
+                        }
+                    },
+                )
+            }
+            // Progress towards saving (matching readings / needed).
+            Box(Modifier.fillMaxWidth().height(2.dp).background(Color.Black.copy(alpha = 0.12f))) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(progress)
+                        .height(2.dp)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                )
+            }
         }
         Spacer(Modifier.height(boxHeight))
     }
