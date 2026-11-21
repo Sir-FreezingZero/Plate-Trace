@@ -109,7 +109,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
         }
     }
 
-    // Declared before the panels so the plates panel's own back handling (detail -> list) wins.
+    // Declared before the panels so the plates page's own back handling (detail -> list) wins.
     BackHandler(enabled = openPanel != OpenPanel.None) { openPanel = OpenPanel.None }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -160,11 +160,15 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             viewModel = viewModel,
             onDismiss = { openPanel = OpenPanel.None },
         )
-        PlatesPanel(
+        // Full-screen page drawn over the camera; the camera keeps running underneath so
+        // recording continues while it's open.
+        PlatesPage(
             visible = openPanel == OpenPanel.Plates,
             plates = plates,
+            recording = recording,
+            recordingSince = recordingSince,
             viewModel = viewModel,
-            onDismiss = { openPanel = OpenPanel.None },
+            onClose = { openPanel = OpenPanel.None },
         )
     }
 }
@@ -316,7 +320,7 @@ private fun RecordButton(recording: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RecordingIndicator(since: Long) {
+internal fun RecordingIndicator(since: Long) {
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(since) {
         while (true) {

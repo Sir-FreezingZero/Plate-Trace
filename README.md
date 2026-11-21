@@ -20,7 +20,7 @@ The whole screen is the camera, with one row of controls along the bottom:
 | Big round button (centre) | Start / stop recording. Plates are only captured while recording; a red timer shows at the top |
 | Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
 | Other bar buttons | Spare, not used yet |
-| ☰ (bottom right) | Slide-out list of saved plates (newest first, with search). Tap one for all its images and detection history; tap an image for full screen; the trash icon deletes it |
+| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen), with search. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
 
 When a plate is saved its number flashes at the top (green = new plate, dark = seen before) and the ☰ button pulses.
 
@@ -41,7 +41,7 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Strictness / repeat timing:** constructor values in `PlateTracker.kt`
   (`confirmFrames`, `confirmWindowMs`, `cooldownMs`).
 - **Crop margin:** `padX` / `padY` in `cropAround()` in `scan/BitmapUtils.kt`.
-- **Vehicle shot size:** the `5.5f` (car width ÷ plate-text width) and `0.8f` (height ÷ width) in `cropVehicle()` in the same file.
+- **Vehicle shot size:** the `6.05f` (car width ÷ plate-text width) and `0.8f` (height ÷ width) in `cropVehicle()` in the same file.
 
 ## Limitations
 - This uses general-purpose OCR with plate rules, not a dedicated plate-detection model.

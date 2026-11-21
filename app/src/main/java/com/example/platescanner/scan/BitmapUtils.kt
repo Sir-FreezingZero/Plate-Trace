@@ -35,12 +35,12 @@ internal fun Bitmap.cropAround(box: Rect, padX: Float = 0.18f, padY: Float = 0.7
  * Zoomed-out crop around a plate that should show the whole back of the car.
  *
  * There's no vehicle detector here, so the box is estimated from the plate: the plate's
- * characters are roughly 1/5 to 1/6 of the width of a car's rear, and the plate sits in its
+ * characters are roughly 1/6 of the width of a car's rear, and the plate sits in its
  * lower part. The box is slid (not shrunk) to stay inside the frame, and the result is
  * scaled down to at most [maxSide] px.
  */
 internal fun Bitmap.cropVehicle(textBox: Rect, maxSide: Int = 1280): Bitmap {
-    val w = (textBox.width() * 5.5f).toInt().coerceIn(1, width)
+    val w = (textBox.width() * 6.05f).toInt().coerceIn(1, width)
     val h = (w * 0.8f).toInt().coerceIn(1, height)
     val left = (textBox.centerX() - w / 2).coerceIn(0, width - w)
     val top = (textBox.centerY() - (h * 0.62f).toInt()).coerceIn(0, height - h)
