@@ -4,9 +4,13 @@ import androidx.compose.animation.core.animateRectAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
@@ -33,6 +37,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -53,7 +59,7 @@ private fun LiveBox.color(): Color = when {
 }
 
 /**
- * Settings → Show live readings: a thin box around each detected plate with a small tag
+ * Settings → Show live readings: a box around each detected plate with a header strip on top
  * showing the reading and its progress towards being saved.
  *
  * Frame → screen mapping matches PreviewView's FILL_CENTER (scale the upright analysis frame to
@@ -86,62 +92,51 @@ fun LiveBoxes(info: FrameInfo, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The plate box with a header strip joined to its top edge, exactly as wide as the box, holding
+ * the reading centred. The text shrinks to fit so it never runs past the box.
+ */
 @Composable
 private fun PlateMarker(b: LiveBox, r: Rect, viewW: Float) {
     val density = LocalDensity.current
     val color = b.color()
+    val headerH = 15.dp
+    val headerPx = with(density) { headerH.toPx() }
+    val stroke = 1.5.dp
+    val shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 2.dp, bottomEnd = 2.dp)
 
-    // Thin box with slightly rounded corners and a dark hairline outside it, so it stays
-    // visible on bright cars and sky.
-    Canvas(
+    val label = (b.savedText ?: b.text ?: "?") + " " + tagStatus(b)
+    // Monospace glyphs are ~0.6 em wide: size the text so the whole label fits the box width.
+    val boxWidthPx = r.width
+    val fitPx = (boxWidthPx - with(density) { 6.dp.toPx() }) / (label.length * 0.6f)
+    val fontSp = with(density) { fitPx.toSp() }.value.coerceIn(7f, 12f).sp
+
+    Column(
         Modifier
-            .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
-            .size(with(density) { r.width.toDp() }, with(density) { r.height.toDp() })
+            .offset { IntOffset(r.left.roundToInt(), (r.top - headerPx).roundToInt()) }
+            .size(with(density) { r.width.toDp() }, with(density) { (r.height + headerPx).toDp() })
+            .border(stroke + 1.dp, Color.Black.copy(alpha = 0.3f), shape) // contrast on bright scenes
+            .border(stroke, color, shape)
+            .clip(shape),
     ) {
-        val radius = CornerRadius(3.dp.toPx())
-        val sw = 1.5.dp.toPx()
-        drawRoundRect(
-            Color.Black.copy(alpha = 0.35f),
-            topLeft = androidx.compose.ui.geometry.Offset(-sw, -sw),
-            size = androidx.compose.ui.geometry.Size(size.width + 2 * sw, size.height + 2 * sw),
-            cornerRadius = radius,
-            style = Stroke(sw),
-        )
-        drawRoundRect(color, cornerRadius = radius, style = Stroke(sw))
-    }
-
-    // Tab attached to the box's top-left corner, kept on screen.
-    Box(
-        Modifier.layout { measurable, _ ->
-            val p = measurable.measure(Constraints())
-            layout(0, 0) {
-                val x = r.left.roundToInt().coerceIn(0, max(0, viewW.roundToInt() - p.width))
-                val y = (r.top.roundToInt() - p.height + 1).coerceAtLeast(0)
-                p.place(x, y)
-            }
-        }
-    ) {
-        Row(
+        Box(
             Modifier
-                .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                .background(color)
-                .padding(horizontal = 5.dp, vertical = 1.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .fillMaxWidth()
+                .height(headerH)
+                .background(color),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
-                b.savedText ?: b.text ?: "?",
+                label,
                 color = Color.Black,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
+                fontSize = fontSp,
                 maxLines = 1,
-            )
-            Text(
-                " " + tagStatus(b),
-                color = Color.Black.copy(alpha = 0.6f),
-                fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
-                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 3.dp),
             )
         }
     }
