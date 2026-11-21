@@ -1059,17 +1059,13 @@ private fun PlateDetail(
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                         // Selectable so the coordinates can be copied.
-                        SelectionContainer {
-                            Column {
-                                placeText(last)?.let { Text(it, fontSize = 14.sp) }
-                                Text(
-                                    coordsText(last) ?: "",
-                                    color = Muted,
-                                    fontSize = 12.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                )
-                            }
-                        }
+                        // Place only; coordinates are in the individual sighting view.
+                        Text(
+                            placeText(last) ?: "Address not available",
+                            color = if (placeText(last) != null) Color.White else Muted,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                        )
                     }
                 }
             }
@@ -1170,16 +1166,6 @@ private fun SightingRow(
             )
             compactPlace(s)?.let {
                 Text(it, color = Muted, fontSize = 12.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            coordsText(s)?.let {
-                Text(
-                    it,
-                    color = Muted.copy(alpha = 0.7f),
-                    fontSize = 10.sp,
-                    lineHeight = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                )
             }
         }
         if (s.vehicleImagePath != null) {
