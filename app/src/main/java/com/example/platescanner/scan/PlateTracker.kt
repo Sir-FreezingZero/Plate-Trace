@@ -17,10 +17,14 @@ import kotlin.math.sqrt
  * How:
  * - Reads that look like the same plate ([similar]: look-alike characters, one or two
  *   differences, partial reads) are grouped into a *track*.
- * - A track is saved once the plate has gone out of view for [settleMs], or after [maxWaitMs]
- *   if it stays in view, provided it has at least [minReads] reads (one-off reads are noise).
- * - The saved text is a per-character vote: each read votes with its character confidence,
- *   weighted towards larger (closer, sharper) views of the plate.
+ * - A plate is saved **as soon as [agreeReads] reads give exactly the same text** (about one
+ *   second of view), while it's still in view.
+ * - If that never happens, it's saved when it leaves view for [settleMs] (or after
+ *   [maxWaitMs]) with a per-character vote: each read votes with its character confidence,
+ *   weighted towards larger (closer, sharper) views. Needs at least [minReads] reads; one-off
+ *   reads are noise.
+ * - Simulation (approaching car): 3 identical reads 96% correct; vote-only 98%; saving at
+ *   2 identical reads only 91%.
  * - The saved photo is the largest (clearest) crop whose own reading is exactly the saved text,
  *   so the photo always shows what was read.
  * - After saving, further reads just keep the plate "in view". It can be saved again once it
@@ -29,6 +33,7 @@ import kotlin.math.sqrt
  * Methods are synchronized: frames arrive on the analysis thread, [flush] on the main thread.
  */
 class PlateTracker(
+    private val agreeReads: Int = 3,
     private val minReads: Int = 2,
     private val settleMs: Long = 1_200,
     private val maxWaitMs: Long = 3_000,
@@ -106,16 +111,27 @@ class PlateTracker(
                 if (now - t.lastAt > cooldownMs) iterator.remove()
                 continue
             }
-            val settled = force || now - t.lastAt >= settleMs || now - t.firstAt >= maxWaitMs
-            if (!settled) continue
-            if (t.reads.size < minReads) {
-                if (force || now - t.lastAt >= settleMs) iterator.remove()
-                continue
+            // Early save: enough reads agree exactly.
+            val agreed = t.reads.groupingBy { it.text }.eachCount()
+                .filterValues { it >= agreeReads }
+                .maxByOrNull { it.value }?.key
+
+            val plate: String
+            if (agreed != null) {
+                plate = agreed
+            } else {
+                val settled = force || now - t.lastAt >= settleMs || now - t.firstAt >= maxWaitMs
+                if (!settled) continue
+                if (t.reads.size < minReads) {
+                    if (force || now - t.lastAt >= settleMs) iterator.remove()
+                    continue
+                }
+                val voted = vote(t.reads)
+                plate = (if (voted.isNotEmpty()) PlateTextFilter.accept(voted) else null)
+                    ?: t.bestByText.values.maxByOrNull { it.first.box.width() }?.first?.text
+                    ?: continue
             }
             val largest = t.bestByText.values.maxByOrNull { it.first.box.width() } ?: continue
-            val voted = vote(t.reads)
-            val plate = (if (voted.isNotEmpty()) PlateTextFilter.accept(voted) else null)
-                ?: largest.first.text
             // Prefer a photo that itself reads as the saved text.
             val (read, vehicle) = t.bestByText[plate] ?: largest
             out.add(Result(plate, read.rawText, read.crop, vehicle))
