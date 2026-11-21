@@ -438,7 +438,7 @@ fun SettingsPage(
 // Building blocks
 // ---------------------------------------------------------------------------------------------
 
-/** A rounded panel with the section's name as its first line, then its rows with fine lines between them. */
+/** A rounded panel headed by the section's name, then its rows with fine lines between them. */
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column(
@@ -448,15 +448,19 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             .clip(CardShape)
             .background(PanelBg),
     ) {
+        // Header: bold, larger than the row names, on a slightly lighter band with a line under it.
         Text(
             title,
-            color = Muted,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
             style = LocalTextStyle.current.merge(TitleStyle),
-            // Same inset as the rows; the first row's own top padding gives the gap below.
-            modifier = Modifier.padding(start = CardPad, end = CardPad, top = CardPad),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White.copy(alpha = 0.04f))
+                .padding(horizontal = CardPad, vertical = 10.dp),
         )
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
         DividedColumn(content)
     }
 }
