@@ -8,6 +8,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.platescanner.data.PlateEntity
+import com.example.platescanner.location.LocationTracker
+import com.example.platescanner.location.PlaceLookup
 import com.example.platescanner.data.PlateRepository
 import com.example.platescanner.data.SightingEntity
 import com.example.platescanner.scan.PhotoLoader
@@ -86,6 +88,11 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _agreeReads = MutableStateFlow(prefs.getInt(KEY_AGREE_READS, 3))
     val agreeReads: StateFlow<Int> = _agreeReads.asStateFlow()
 
+    /** Location of each sighting (Settings → Save location). */
+    val locationTracker = LocationTracker(app)
+    private val _saveLocation = MutableStateFlow(prefs.getBoolean(KEY_SAVE_LOCATION, true))
+    val saveLocation: StateFlow<Boolean> = _saveLocation.asStateFlow()
+
     private val _autoDelete = MutableStateFlow(prefs.getBoolean(KEY_AUTO_DELETE, false))
     val autoDelete: StateFlow<Boolean> = _autoDelete.asStateFlow()
 
@@ -133,6 +140,26 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
                 kotlinx.coroutines.delay(10 * 60_000L)
             }
         }
+    }
+
+    /** Fills in road / city / state for a sighting in the background, when the lookup works. */
+    private fun lookUpPlace(sightingId: Long, latitude: Double, longitude: Double) {
+        if (sightingId == 0L) return
+        viewModelScope.launch {
+            val place = PlaceLookup.lookup(getApplication<Application>(), latitude, longitude) ?: return@launch
+            repository.setPlace(sightingId, place.road, place.city, place.state)
+        }
+    }
+
+    fun setSaveLocation(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SAVE_LOCATION, enabled).apply()
+        _saveLocation.value = enabled
+        if (enabled && _recording.value) locationTracker.start() else locationTracker.stop()
+    }
+
+    /** Call after the location permission prompt so tracking starts if it was granted. */
+    fun onLocationPermissionResult() {
+        if (_saveLocation.value && _recording.value) locationTracker.start()
     }
 
     fun setAutoDelete(enabled: Boolean) {
@@ -226,6 +253,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         if (on) _recordingSince.value = SystemClock.elapsedRealtime()
         analyzer.enabled = on
         _recording.value = on
+        if (on && _saveLocation.value) locationTracker.start() else if (!on) locationTracker.stop()
         if (!on) {
             // Save plates still being voted on. Runs on the analysis thread, after any frame
             // that's mid-processing.
@@ -247,16 +275,20 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
             if (detections.isEmpty()) {
                 _notices.tryEmit(Notice("No plate found in photo", Notice.Kind.INFO))
             } else {
-                save(detections)
+                save(detections, live = false)
             }
         }
     }
 
-    private fun save(detections: List<PlateDetection>) {
+    /** [live]: from the camera (gets a location) rather than a gallery photo. */
+    private fun save(detections: List<PlateDetection>, live: Boolean = true) {
         viewModelScope.launch {
             for (d in detections) {
                 try {
-                    val result = repository.save(d.plate, d.rawText, d.crop, d.vehicle)
+                    // Location only for live captures (not gallery photos), and only if recent.
+                    val location = if (live && _saveLocation.value) locationTracker.current() else null
+                    val result = repository.save(d.plate, d.rawText, d.crop, d.vehicle, location)
+                    if (location != null) lookUpPlace(result.sightingId, location.latitude, location.longitude)
                     // Also alert for a reading that differs from a watched plate only by
                     // look-alike characters (0/O, 8/B …).
                     val plate = result.plateNumber.ifEmpty { d.plate } // may be an existing spelling
@@ -357,6 +389,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        locationTracker.stop()
         analyzer.enabled = false
         analysisExecutor.shutdown()
         analyzer.close()
@@ -369,6 +402,7 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_AGREE_READS = "agree_reads"
         const val KEY_CAPTURE_MODE = "capture_mode"
         const val KEY_AUTO_DELETE = "auto_delete"
+        const val KEY_SAVE_LOCATION = "save_location"
         const val KEY_AUTO_DELETE_DAYS = "auto_delete_days"
         const val KEY_AUTO_DELETE_HOURS = "auto_delete_hours"
         const val KEY_DETECT_THRESHOLD = "detect_threshold_pct"

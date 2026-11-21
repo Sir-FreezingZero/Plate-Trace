@@ -33,7 +33,13 @@ class PlateRepository(context: Context) {
     fun sightings(plateId: Long): Flow<List<SightingEntity>> = dao.observeSightings(plateId)
 
     /** @return whether the plate is new and whether it's on the watch list. */
-    suspend fun save(plateNumber: String, rawText: String, crop: Bitmap, vehicle: Bitmap): SaveResult =
+    suspend fun save(
+        plateNumber: String,
+        rawText: String,
+        crop: Bitmap,
+        vehicle: Bitmap,
+        location: android.location.Location? = null,
+    ): SaveResult =
         withContext(Dispatchers.IO) {
             val timestamp = System.currentTimeMillis()
             val plateFile = File(imageDir, "${plateNumber}_$timestamp.jpg")
@@ -47,6 +53,9 @@ class PlateRepository(context: Context) {
             val result = dao.recordSighting(
                 plateNumber, rawText, timestamp, plateFile.absolutePath, vehicleFile.absolutePath,
                 markWatched = watch != null,
+                latitude = location?.latitude,
+                longitude = location?.longitude,
+                accuracyM = location?.takeIf { it.hasAccuracy() }?.accuracy,
             )
             if (watch != null) dao.deleteWatch(watch.plateNumber)
             result
@@ -65,6 +74,9 @@ class PlateRepository(context: Context) {
     suspend fun merge(fromId: Long, intoId: Long) = withContext(Dispatchers.IO) {
         dao.merge(fromId, intoId)
     }
+
+    suspend fun setPlace(sightingId: Long, road: String?, city: String?, state: String?) =
+        withContext(Dispatchers.IO) { dao.setPlace(sightingId, road, city, state) }
 
     suspend fun setStarred(plateId: Long, starred: Boolean) = withContext(Dispatchers.IO) {
         dao.setStarred(plateId, starred)

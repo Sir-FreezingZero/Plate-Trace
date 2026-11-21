@@ -9,13 +9,25 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [PlateEntity::class, SightingEntity::class, WatchEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class PlateDatabase : RoomDatabase() {
     abstract fun plateDao(): PlateDao
 
     companion object {
+        /** v6: where each sighting was seen. */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sightings ADD COLUMN latitude REAL")
+                db.execSQL("ALTER TABLE sightings ADD COLUMN longitude REAL")
+                db.execSQL("ALTER TABLE sightings ADD COLUMN accuracyM REAL")
+                db.execSQL("ALTER TABLE sightings ADD COLUMN road TEXT")
+                db.execSQL("ALTER TABLE sightings ADD COLUMN city TEXT")
+                db.execSQL("ALTER TABLE sightings ADD COLUMN state TEXT")
+            }
+        }
+
         /** v5: starred plates (kept by auto-delete). */
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -56,7 +68,7 @@ abstract class PlateDatabase : RoomDatabase() {
                     context.applicationContext,
                     PlateDatabase::class.java,
                     "plates.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
             }
     }
 }

@@ -102,6 +102,7 @@ fun SettingsPage(
     val detectThreshold by viewModel.detectThreshold.collectAsStateWithLifecycle()
     val readThreshold by viewModel.readThreshold.collectAsStateWithLifecycle()
     val autoDelete by viewModel.autoDelete.collectAsStateWithLifecycle()
+    val saveLocation by viewModel.saveLocation.collectAsStateWithLifecycle()
     val autoDeleteHours by viewModel.autoDeleteHours.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
@@ -127,6 +128,12 @@ fun SettingsPage(
                     description = "Full-resolution photos: sharper and reads further, but fewer per second.",
                     checked = photos,
                     onChange = { viewModel.setCaptureMode(if (it) CaptureMode.PHOTO else CaptureMode.VIDEO) },
+                )
+                ToggleRow(
+                    title = "Save location",
+                    description = "Latitude/longitude with each sighting, plus road, city and state when online.",
+                    checked = saveLocation,
+                    onChange = viewModel::setSaveLocation,
                 )
                 SliderRow(
                     title = "Photo interval",

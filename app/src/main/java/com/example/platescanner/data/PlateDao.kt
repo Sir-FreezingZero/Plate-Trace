@@ -9,7 +9,12 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Outcome of saving a sighting. */
-data class SaveResult(val isNew: Boolean, val watched: Boolean, val plateNumber: String = "")
+data class SaveResult(
+    val isNew: Boolean,
+    val watched: Boolean,
+    val plateNumber: String = "",
+    val sightingId: Long = 0,
+)
 
 @Dao
 abstract class PlateDao {
@@ -25,6 +30,9 @@ abstract class PlateDao {
 
     @Query("DELETE FROM watches WHERE plateNumber = :plateNumber")
     abstract suspend fun deleteWatch(plateNumber: String)
+
+    @Query("UPDATE sightings SET road = :road, city = :city, state = :state WHERE id = :id")
+    abstract suspend fun setPlace(id: Long, road: String?, city: String?, state: String?)
 
     @Query("SELECT * FROM plates WHERE lastSeen >= :since")
     abstract suspend fun platesSeenSince(since: Long): List<PlateEntity>
@@ -114,6 +122,9 @@ abstract class PlateDao {
         imagePath: String,
         vehicleImagePath: String?,
         markWatched: Boolean = false,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        accuracyM: Float? = null,
     ): SaveResult {
         val existing = findByNumber(number)
         val plateId: Long
@@ -144,12 +155,15 @@ abstract class PlateDao {
             plateId = existing.id
             isNew = false
         }
-        insertSighting(
+        val sightingId = insertSighting(
             SightingEntity(
                 plateId = plateId,
                 timestamp = timestamp,
                 imagePath = imagePath,
                 vehicleImagePath = vehicleImagePath,
+                latitude = latitude,
+                longitude = longitude,
+                accuracyM = accuracyM,
                 rawText = rawText,
             )
         )
@@ -157,6 +171,7 @@ abstract class PlateDao {
             isNew = isNew,
             watched = existing?.watched == true || markWatched,
             plateNumber = number,
+            sightingId = sightingId,
         )
     }
 

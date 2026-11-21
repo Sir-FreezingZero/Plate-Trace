@@ -100,6 +100,24 @@ fun ScannerScreen(viewModel: PlateViewModel) {
     var watchCount by remember { mutableIntStateOf(0) }
     val pulse = remember { Animatable(0f) }
 
+    // Location permission is asked the first time recording starts (recording works without it).
+    val saveLocation by viewModel.saveLocation.collectAsStateWithLifecycle()
+    val locationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { viewModel.onLocationPermissionResult() }
+    val onRecord: () -> Unit = {
+        val starting = !recording
+        viewModel.toggleRecording()
+        if (starting && saveLocation && !viewModel.locationTracker.hasPermission()) {
+            locationPermission.launch(
+                arrayOf(
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            )
+        }
+    }
+
     val pickPhoto = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> if (uri != null) viewModel.scanPhoto(uri) }
@@ -174,7 +192,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             plateCount = plates.size,
             onSettings = { openPanel = OpenPanel.Settings },
             onMenu = { openPanel = OpenPanel.Plates },
-            onRecord = viewModel::toggleRecording,
+            onRecord = onRecord,
             captureMode = captureMode,
             onSwitchMode = viewModel::toggleCaptureMode,
             onPickPhoto = {

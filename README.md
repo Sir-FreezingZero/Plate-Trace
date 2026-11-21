@@ -50,6 +50,9 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Show live readings:** while recording, draws a box around every plate the detector finds, with a strip on top showing the plate number read in that frame and a strip underneath showing status only: `2/3` (matching readings), `saved`, `unsure`, or `—` (not a plate format). White while reading, green once saved, amber when rejected. Also shows the image size being read and how long each one takes. Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 
+### Location
+While recording, each sighting saves the phone's latitude and longitude (with accuracy), using Android's own location service; no maps are used. When the phone is online, the road, city and state are looked up with Android's built-in geocoder and added a moment later. A plate's page shows its **last location**, and each sighting in its history shows where it was seen (the text can be selected to copy). Location permission is asked the first time you start recording; turn it off any time in **Settings → Capture → Save location**. Gallery photo scans don't get a location.
+
 ### Duplicate misreads
 Nothing is merged. A plate's detail page lists **similar plates** (look-alike characters, or one or two characters off) as likely misreads; tap one to open that plate.
 

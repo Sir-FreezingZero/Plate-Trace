@@ -49,6 +49,15 @@ data class SightingEntity(
     val imagePath: String,
     /** Wider crop showing the back of the vehicle (null for sightings saved before v2). */
     val vehicleImagePath: String? = null,
+    /** Where it was seen (null if location was off or unavailable). */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    /** GPS accuracy radius in metres. */
+    val accuracyM: Float? = null,
+    /** Looked up from the coordinates when online (may stay null). */
+    val road: String? = null,
+    val city: String? = null,
+    val state: String? = null,
     /** Text exactly as the recogniser read it, before normalisation (e.g. "ABC-1234"). */
     val rawText: String,
 )

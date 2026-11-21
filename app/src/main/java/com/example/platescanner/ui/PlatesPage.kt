@@ -54,6 +54,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import kotlin.math.roundToInt
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.RadioButton
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -1024,6 +1026,33 @@ private fun PlateDetail(
                 }
             }
 
+            sightings.firstOrNull { it.latitude != null }?.let { last ->
+                item(key = "location") {
+                    Column(Modifier.padding(bottom = 12.dp)) {
+                        Text(
+                            "LAST LOCATION",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                        // Selectable so the coordinates can be copied.
+                        SelectionContainer {
+                            Column {
+                                placeText(last)?.let { Text(it, fontSize = 14.sp) }
+                                Text(
+                                    coordsText(last) ?: "",
+                                    color = Muted,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             item(key = "historyHeader") {
                 Text(
                     "HISTORY",
@@ -1096,9 +1125,13 @@ private fun SightingRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TimelineGutter(if (highlight) Dot.Highlight else Dot.Small, lineAbove, lineBelow)
-        Column(Modifier.weight(1f).padding(start = 6.dp)) {
+        Column(Modifier.weight(1f).padding(start = 6.dp, end = 6.dp)) {
             Text(shortDateTime(s.timestamp), fontSize = 13.sp, maxLines = 1)
             Text(relative(s.timestamp), color = Muted, fontSize = 11.sp, maxLines = 1)
+            placeText(s)?.let { Text(it, color = Muted, fontSize = 11.sp, maxLines = 1) }
+            coordsText(s)?.let {
+                Text(it, color = Muted.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, maxLines = 1)
+            }
         }
         if (s.vehicleImagePath != null) {
             AsyncImage(
@@ -1213,4 +1246,16 @@ private fun dayLabel(time: Long): Pair<String, Boolean> {
         "EEE, MMM d, yyyy"
     }
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(time)) to false
+}
+
+/** "Route 9, Toms River, New Jersey", or null if no place was looked up. */
+private fun placeText(s: SightingEntity): String? =
+    listOfNotNull(s.road, s.city, s.state).filter { it.isNotBlank() }.joinToString(", ").ifEmpty { null }
+
+/** "40.12345, -74.12345 ±8 m", or null if no location was saved. */
+private fun coordsText(s: SightingEntity): String? {
+    val lat = s.latitude ?: return null
+    val lng = s.longitude ?: return null
+    val acc = s.accuracyM?.let { " ±${it.roundToInt()} m" } ?: ""
+    return "%.5f, %.5f".format(Locale.US, lat, lng) + acc
 }
