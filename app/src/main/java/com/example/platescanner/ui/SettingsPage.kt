@@ -91,26 +91,25 @@ private val FormatPresets = listOf(
 )
 
 /** Padding inside cards, on every side of every row. */
-private val CardPad = 10.dp
+private val CardPad = 8.dp
 
 private val RowPadding = Modifier.padding(horizontal = CardPad)
 
 /** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
-private val PillHeight = 26.dp
+private val PillHeight = 22.dp
 /** Every control's corner radius; the card corner is this + [CardPad], so they're concentric. */
-private val ControlRadius = 8.dp
-private val PillShape = RoundedCornerShape(ControlRadius)
+private val ControlRadius = 11.dp // half of PillHeight: every control has fully round ends
+private val PillShape = RoundedCornerShape(50)
 private val PillBg = Color.White.copy(alpha = 0.08f)
 
 /**
- * Geometry: every control in a card (slider thumb, number box, switch, selector, buttons) is
- * 26dp tall with [ControlRadius] corners, rows are padded [CardPad] on all sides, and the card's
- * corner radius is ControlRadius + CardPad — so a control in a card's corner is concentric with
- * that corner.
+ * Geometry: every control in a card (slider thumb, number box, switch, selector, buttons) is a
+ * 22dp pill or circle (radius 11dp), rows are padded [CardPad] (8dp) on all sides, and the card's
+ * corner radius is 11 + 8 = 19dp — so a control in a card's corner is concentric with it.
  */
 private val CardShape = RoundedCornerShape(ControlRadius + CardPad)
 
-/** Slider with a 26dp thumb using the same corner radius as the other controls. */
+/** Slider with a round thumb the same height as the other controls (22dp). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PillSlider(
@@ -146,7 +145,7 @@ private fun PillSlider(
             Box(
                 Modifier
                     .size(PillHeight)
-                    .clip(PillShape)
+                    .clip(CircleShape)
                     .background(Color.White)
             )
         },
@@ -559,15 +558,15 @@ private fun ToggleRow(
 }
 
 /**
- * Switch drawn to match the other controls: 44×26, [ControlRadius] corners, with a 20dp knob
- * inset 3dp whose corners are concentric with the track (8 − 3 = 5dp).
+ * Switch drawn to match the other controls: a 38×22 pill with a round 16dp knob inset 3dp
+ * (concentric with the pill's ends).
  */
 @Composable
 private fun CompactSwitch(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    val knobX by animateDpAsState(if (checked) 21.dp else 3.dp, label = "knob")
+    val knobX by animateDpAsState(if (checked) 19.dp else 3.dp, label = "knob")
     Box(
         Modifier
-            .width(44.dp)
+            .width(38.dp)
             .height(PillHeight)
             .clip(PillShape)
             .background(if (checked) Accent else PillBg)
@@ -576,8 +575,8 @@ private fun CompactSwitch(checked: Boolean, enabled: Boolean, onChange: (Boolean
         Box(
             Modifier
                 .offset(x = knobX, y = 3.dp)
-                .size(20.dp)
-                .clip(RoundedCornerShape(ControlRadius - 3.dp))
+                .size(16.dp)
+                .clip(CircleShape)
                 .background(if (checked) Color.Black else Color.White.copy(alpha = 0.85f))
         )
     }
@@ -807,7 +806,7 @@ private fun ChoiceRow(
     Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = CardPad)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            // Track with the selected option inset 2dp; its corners are 2dp tighter (concentric).
+            // Pill track with a pill-shaped selected option inset 2dp (concentric).
             Row(
                 Modifier
                     .height(PillHeight)
@@ -820,7 +819,7 @@ private fun ChoiceRow(
                     Box(
                         Modifier
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(ControlRadius - 2.dp))
+                            .clip(PillShape)
                             .background(if (i == selected) Color.White else Color.Transparent)
                             .clickable { onSelect(i) }
                             .padding(horizontal = 10.dp),
