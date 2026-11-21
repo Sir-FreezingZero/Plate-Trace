@@ -86,6 +86,14 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     private val _agreeReads = MutableStateFlow(prefs.getInt(KEY_AGREE_READS, 3))
     val agreeReads: StateFlow<Int> = _agreeReads.asStateFlow()
 
+    /** Percent, 5–95. */
+    private val _detectThreshold = MutableStateFlow(prefs.getInt(KEY_DETECT_THRESHOLD, 40))
+    val detectThreshold: StateFlow<Int> = _detectThreshold.asStateFlow()
+
+    /** Percent, 5–95. */
+    private val _readThreshold = MutableStateFlow(prefs.getInt(KEY_READ_THRESHOLD, 40))
+    val readThreshold: StateFlow<Int> = _readThreshold.asStateFlow()
+
     private val _showLive = MutableStateFlow(prefs.getBoolean(KEY_SHOW_LIVE, false))
     val showLive: StateFlow<Boolean> = _showLive.asStateFlow()
 
@@ -105,6 +113,20 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         applyShowLive(_showLive.value)
         analyzer.agreeReads = _agreeReads.value
         applyCapture()
+        analyzer.detectThreshold = _detectThreshold.value / 100f
+        analyzer.minCharConfidence = _readThreshold.value / 100f
+    }
+
+    fun setDetectThreshold(percent: Int) {
+        prefs.edit().putInt(KEY_DETECT_THRESHOLD, percent).apply()
+        _detectThreshold.value = percent
+        analyzer.detectThreshold = percent / 100f
+    }
+
+    fun setReadThreshold(percent: Int) {
+        prefs.edit().putInt(KEY_READ_THRESHOLD, percent).apply()
+        _readThreshold.value = percent
+        analyzer.minCharConfidence = percent / 100f
     }
 
     fun setCaptureMode(mode: CaptureMode) {
@@ -263,6 +285,8 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_SHOW_LIVE = "show_live_readings"
         const val KEY_AGREE_READS = "agree_reads"
         const val KEY_CAPTURE_MODE = "capture_mode"
+        const val KEY_DETECT_THRESHOLD = "detect_threshold_pct"
+        const val KEY_READ_THRESHOLD = "read_threshold_pct"
         const val KEY_PHOTO_INTERVAL = "photo_interval_ms"
         const val KEY_FORMAT_MASKS = "format_masks"
         /** v2: multiple of the detected plate's width (v1 was of the text width). */

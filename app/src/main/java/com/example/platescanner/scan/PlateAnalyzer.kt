@@ -79,6 +79,12 @@ class PlateAnalyzer(
     /** Car shot width as a multiple of the plate's width (Settings). */
     @Volatile var vehicleScale: Float = 4.5f
 
+    /** Minimum detector score (0–1) for a box to be treated as a plate (Settings). */
+    @Volatile var detectThreshold: Float = PlateEngine.DETECT_THRESHOLD
+
+    /** Minimum confidence (0–1) of every character for a reading to be used (Settings). */
+    @Volatile var minCharConfidence: Float = 0.4f
+
     /** Frames are only analysed while recording. */
     @Volatile var enabled: Boolean = false
 
@@ -184,11 +190,11 @@ class PlateAnalyzer(
     /** Steps 1–4: detect, crop, read, check format. */
     private fun findAndRead(frame: Bitmap, live: MutableList<LiveBox>? = null): List<PlateTracker.Read> {
         val models = engine ?: return emptyList()
-        return models.detect(frame).mapNotNull { detection ->
+        return models.detect(frame, detectThreshold).mapNotNull { detection ->
             val crop = frame.cropAround(detection.box)
             val reading = models.read(crop)
             val text = reading.text.ifEmpty { null }
-            if (reading.text.length < 2 || reading.minConfidence < MIN_CHAR_CONFIDENCE) {
+            if (reading.text.length < 2 || reading.minConfidence < minCharConfidence) {
                 live?.add(LiveBox(detection.box, text, reading.minConfidence, accepted = false, reason = "unsure"))
                 return@mapNotNull null
             }
@@ -215,7 +221,5 @@ class PlateAnalyzer(
     private companion object {
         const val TAG = "PlateAnalyzer"
 
-        /** Reads where any character is less certain than this are ignored. */
-        const val MIN_CHAR_CONFIDENCE = 0.4f
     }
 }

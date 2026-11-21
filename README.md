@@ -42,6 +42,7 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 
 ### Settings
 - **Plate format:** *US plates* (default: needs letters and numbers, so phone numbers are ignored), *Only specific formats* (tick formats such as ABC 1234 or 1ABC234, or add your own with L = letter, 0 = number, * = either; look-alike characters like 0/O and 8/B are corrected to fit), or *Any plate-like text*.
+- **Detection:** *Plate detection confidence* (how sure it must be that a box is a plate before reading it) and *Reading confidence* (how sure it must be of every character), 5–95%, default 40%.
 - **Read plates from:** *Video* (live 1080p feed, several images a second; default) or *Photos* (a full-resolution photo every 0.5–3 s; sharper and reads further on many phones, but fewer images, so fast-passing cars may be missed). In photo mode a single clear read is enough to save a car that only appears in one photo.
 - **Matching readings to save:** 2–5 frames must read exactly the same text before a plate is saved (default 3).
 - **Save the same plate again after:** how long a plate must be out of view before it's saved again.
@@ -54,7 +55,7 @@ Tap the bell on any plate (in the list or on its detail page) to watch it. When 
 ### Tuning in code
 - **Save timing:** `agreeReads` (matching reads needed to save), `minReads`, `settleMs`, `maxWaitMs` in `PlateTracker.kt`.
 - **Plate crop margin:** `PLATE_PAD_X` / `PLATE_PAD_Y` in `scan/PlateEngine.kt`.
-- **Detector / reader thresholds:** `DETECT_THRESHOLD` in `PlateEngine.kt`, `MIN_CHAR_CONFIDENCE` in `PlateAnalyzer.kt`.
+
 
 ## Limitations
 - Plates need to be roughly 75+ px wide in the 1080p camera frame to be found (about 2–3 car lengths away on most phones). Far-away plates are missed.

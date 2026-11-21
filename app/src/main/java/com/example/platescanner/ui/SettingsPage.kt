@@ -94,6 +94,8 @@ fun SettingsPage(
     val agree by viewModel.agreeReads.collectAsStateWithLifecycle()
     val captureMode by viewModel.captureMode.collectAsStateWithLifecycle()
     val photoInterval by viewModel.photoIntervalMs.collectAsStateWithLifecycle()
+    val detectThreshold by viewModel.detectThreshold.collectAsStateWithLifecycle()
+    val readThreshold by viewModel.readThreshold.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val sightings = plates.sumOf { it.sightingCount }
     val specific = rules.mode == FormatMode.SPECIFIC
@@ -160,6 +162,31 @@ fun SettingsPage(
                         modifier = RowPadding.padding(bottom = 4.dp),
                     )
                 }
+            }
+
+            Section("Detection") {
+                SliderRow(
+                    title = "Plate detection confidence",
+                    description = "How sure it must be that something is a plate before reading it. " +
+                        "Lower finds more (incl. distant plates and false boxes).",
+                    value = detectThreshold.toFloat(),
+                    range = 5f..95f,
+                    step = 5f,
+                    unit = "%",
+                    decimals = 0,
+                    onChange = { viewModel.setDetectThreshold(it.roundToInt()) },
+                )
+                SliderRow(
+                    title = "Reading confidence",
+                    description = "How sure it must be of every character before using a reading. " +
+                        "Lower accepts more (and more misreads).",
+                    value = readThreshold.toFloat(),
+                    range = 5f..95f,
+                    step = 5f,
+                    unit = "%",
+                    decimals = 0,
+                    onChange = { viewModel.setReadThreshold(it.roundToInt()) },
+                )
             }
 
             Section("Capture") {
