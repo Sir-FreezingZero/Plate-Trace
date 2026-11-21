@@ -86,6 +86,9 @@ private val FormatPresets = listOf(
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
 )
 
+/** Padding inside cards, on every side of every row. */
+private val CardPad = 10.dp
+
 private val RowPadding = Modifier.padding(horizontal = CardPad)
 
 /** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
@@ -98,7 +101,6 @@ private val PillBg = Color.White.copy(alpha = 0.08f)
  * (radius 13dp), rows are padded [CardPad] on all sides, and the card's corner radius is
  * 13 + 10 = 23dp — so a control in a card's corner is concentric with that corner.
  */
-private val CardPad = 10.dp
 private val CardShape = RoundedCornerShape(23.dp)
 
 /** Slider with a 26dp round thumb (same radius as the pills and the card corner geometry). */
