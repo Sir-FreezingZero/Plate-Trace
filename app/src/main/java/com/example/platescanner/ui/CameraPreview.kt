@@ -5,6 +5,7 @@ import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -44,7 +45,15 @@ fun CameraPreview(
             if (disposed) return@addListener
             val cameraProvider = providerFuture.get().also { provider = it }
 
-            val preview = Preview.Builder().build().also {
+            // Preview and analysis both 16:9 so they show the same area of the sensor, which
+            // lets the live-readings boxes line up with the preview.
+            val preview = Preview.Builder()
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                        .build()
+                )
+                .build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
@@ -52,6 +61,7 @@ fun CameraPreview(
             val analysis = ImageAnalysis.Builder()
                 .setResolutionSelector(
                     ResolutionSelector.Builder()
+                        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
                         .setResolutionStrategy(
                             ResolutionStrategy(
                                 Size(1920, 1080),

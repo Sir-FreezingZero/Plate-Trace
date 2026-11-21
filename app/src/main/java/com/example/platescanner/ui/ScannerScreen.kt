@@ -134,6 +134,7 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             analysisExecutor = viewModel.analysisExecutor,
             modifier = Modifier.fillMaxSize(),
         )
+        liveInfo?.let { LiveBoxes(it, Modifier.fillMaxSize()) }
 
         Column(
             modifier = Modifier
@@ -216,13 +217,16 @@ private fun LiveReadout(info: com.example.platescanner.scan.FrameInfo) {
             "${info.width}×${info.height} · ${info.millis} ms",
             color = Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
         )
-        if (info.reads.isEmpty()) {
+        if (info.boxes.isEmpty()) {
             Text("no plate", color = Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
-        info.reads.forEach { (text, conf, width) ->
+        info.boxes.forEach { b ->
             Text(
-                "%-9s %3d%%  %dpx".format(text, (conf * 100).toInt(), width),
-                color = if (conf >= 0.8f) Color.White else WatchAmber,
+                "%-9s %3d%%  %dpx%s".format(
+                    b.text ?: "?", (b.confidence * 100).toInt(), b.box.width(),
+                    if (b.accepted) "" else "  ✕",
+                ),
+                color = if (b.accepted) Color.White else WatchAmber,
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
             )
