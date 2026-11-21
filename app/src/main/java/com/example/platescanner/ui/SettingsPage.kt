@@ -30,6 +30,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.Layout
 import androidx.compose.runtime.getValue
@@ -84,15 +86,65 @@ private val FormatPresets = listOf(
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
 )
 
-private val RowPadding = Modifier.padding(horizontal = 12.dp)
+private val RowPadding = Modifier.padding(horizontal = CardPad)
 
 /** Pills inside cards: 26dp tall, fully rounded (radius 13dp). */
 private val PillHeight = 26.dp
 private val PillShape = RoundedCornerShape(50)
 private val PillBg = Color.White.copy(alpha = 0.08f)
 
-/** Card corners are concentric with the pills: 12dp row padding + 13dp pill radius ≈ 26dp. */
-private val CardShape = RoundedCornerShape(26.dp)
+/**
+ * Geometry: every control in a card (slider thumb, number pill, switch, selector) is a 26dp pill
+ * (radius 13dp), rows are padded [CardPad] on all sides, and the card's corner radius is
+ * 13 + 10 = 23dp — so a control in a card's corner is concentric with that corner.
+ */
+private val CardPad = 10.dp
+private val CardShape = RoundedCornerShape(23.dp)
+
+/** Slider with a 26dp round thumb (same radius as the pills and the card corner geometry). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PillSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = SliderDefaults.colors(
+        thumbColor = Color.White,
+        activeTrackColor = Accent,
+        inactiveTrackColor = PillBg,
+        activeTickColor = Color.Transparent,
+        inactiveTickColor = Color.Transparent,
+        disabledThumbColor = Color.White,
+        disabledActiveTrackColor = Accent,
+        disabledInactiveTrackColor = PillBg,
+        disabledActiveTickColor = Color.Transparent,
+        disabledInactiveTickColor = Color.Transparent,
+    )
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        valueRange = valueRange,
+        steps = steps,
+        enabled = enabled,
+        colors = colors,
+        thumb = {
+            Box(
+                Modifier
+                    .size(PillHeight)
+                    .clip(CircleShape)
+                    .background(Color.White)
+            )
+        },
+        track = { state -> SliderDefaults.Track(sliderState = state, colors = colors, enabled = enabled) },
+        modifier = modifier.height(PillHeight),
+    )
+}
 
 /** Small tinted pill button, e.g. "Add", "Delete all". */
 @Composable
@@ -274,7 +326,7 @@ fun SettingsPage(
                         "No formats on: nothing will be saved.",
                         color = RecordRed,
                         fontSize = 11.sp,
-                        modifier = RowPadding.padding(vertical = 8.dp),
+                        modifier = RowPadding.padding(vertical = CardPad),
                     )
                 }
             }
@@ -320,7 +372,7 @@ fun SettingsPage(
                     Modifier
                         .fillMaxWidth()
                         .then(RowPadding)
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = CardPad),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RowText(
@@ -373,15 +425,14 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             color = Muted,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = 26.dp, end = 26.dp, bottom = 8.dp),
+            modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 8.dp),
         )
         Box(
             Modifier
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
                 .clip(CardShape)
-                .background(PanelBg)
-                .border(1.dp, LineColor, CardShape),
+                .background(PanelBg),
         ) {
             DividedColumn(content)
         }
@@ -426,7 +477,7 @@ private fun SubLabel(text: String, enabled: Boolean = true) {
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
         modifier = RowPadding
-            .padding(top = 8.dp, bottom = 6.dp)
+            .padding(top = 8.dp, bottom = 8.dp)
             .alpha(if (enabled) 1f else 0.6f),
     )
 }
@@ -486,7 +537,7 @@ private fun ToggleRow(
             .fillMaxWidth()
             .clickable(enabled = enabled) { onChange(!checked) }
             .then(RowPadding)
-            .padding(vertical = 10.dp)
+            .padding(vertical = CardPad)
             .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -535,7 +586,7 @@ private fun SliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 10.dp, bottom = 6.dp)
+            .padding(vertical = CardPad)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -547,26 +598,14 @@ private fun SliderRow(
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Slider(
+            PillSlider(
                 value = current,
                 onValueChange = { current = snap(it) },
                 onValueChangeFinished = { onChange(current) },
                 valueRange = range,
                 steps = (((range.endInclusive - range.start) / step).roundToInt() - 1).coerceAtLeast(0),
                 enabled = enabled,
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Accent,
-                    inactiveTrackColor = FieldColor,
-                    activeTickColor = Color.Transparent,
-                    inactiveTickColor = Color.Transparent,
-                    disabledThumbColor = Color.White,
-                    disabledActiveTrackColor = Accent,
-                    disabledInactiveTrackColor = FieldColor,
-                    disabledActiveTickColor = Color.Transparent,
-                    disabledInactiveTickColor = Color.Transparent,
-                ),
-                modifier = Modifier.weight(1f).height(28.dp),
+                modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(10.dp))
             NumberBox(
@@ -634,13 +673,13 @@ private fun DurationSliderRow(
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(top = 10.dp, bottom = 6.dp)
+            .padding(vertical = CardPad)
             .alpha(if (enabled) 1f else 0.38f),
     ) {
         RowText(title, description)
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Slider(
+            PillSlider(
                 value = index,
                 onValueChange = {
                     index = it.roundToInt().toFloat()
@@ -651,19 +690,7 @@ private fun DurationSliderRow(
                 valueRange = 0f..(DurationStops.size - 1).toFloat(),
                 steps = DurationStops.size - 2,
                 enabled = enabled,
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Accent,
-                    inactiveTrackColor = FieldColor,
-                    activeTickColor = Color.Transparent,
-                    inactiveTickColor = Color.Transparent,
-                    disabledThumbColor = Color.White,
-                    disabledActiveTrackColor = Accent,
-                    disabledInactiveTrackColor = FieldColor,
-                    disabledActiveTickColor = Color.Transparent,
-                    disabledInactiveTickColor = Color.Transparent,
-                ),
-                modifier = Modifier.weight(1f).height(28.dp),
+                modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(10.dp))
             Box(
@@ -756,7 +783,7 @@ private fun ChoiceRow(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = 10.dp)) {
+    Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = CardPad)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             // Pill track with a pill-shaped selected option inset 2dp (concentric).
@@ -802,7 +829,7 @@ private fun AddFormatRow(enabled: Boolean, onAdd: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .then(RowPadding)
-            .padding(vertical = 10.dp)
+            .padding(vertical = CardPad)
             .alpha(if (enabled) 1f else 0.38f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
