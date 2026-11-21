@@ -42,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Notifications
@@ -53,6 +54,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.SwipeToDismissBox
@@ -184,6 +188,8 @@ fun PlatesPage(
                 PlateTimeline(
                     plates = shownPlates,
                     onSwipeDelete = swipeDelete,
+                    onDeleteMany = { ids -> ids.forEach { viewModel.delete(it) } },
+                    onMerge = { intoId, fromIds -> fromIds.forEach { viewModel.merge(it, intoId) } },
                     watches = watches,
                     onAddWatch = { text ->
                         val ok = viewModel.addWatch(text)
@@ -231,6 +237,69 @@ fun PlatesPage(
             pendingDelete = null
         }
     }
+}
+
+/** Replaces the page header while plates are selected. */
+@Composable
+private fun SelectionHeader(count: Int, onClose: () -> Unit, onMerge: () -> Unit, onDelete: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 4.dp).height(52.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(Icons.Filled.Close, contentDescription = "Stop selecting")
+        }
+        Text("$count selected", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        TextButton(onClick = onMerge, enabled = count >= 2) {
+            Text("Merge", color = if (count >= 2) Color.White else Muted)
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Filled.Delete, contentDescription = "Delete selected", tint = RecordRed)
+        }
+    }
+}
+
+/** Choose which selected plate to keep; the others' sightings and photos move into it. */
+@Composable
+private fun MergeDialog(plates: List<PlateEntity>, onMerge: (Long) -> Unit, onDismiss: () -> Unit) {
+    var keep by remember(plates) {
+        mutableStateOf(plates.maxByOrNull { it.sightingCount }?.id ?: plates.first().id)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Merge ${plates.size} plates") },
+        text = {
+            Column {
+                Text(
+                    "Keep which plate number? The others' sightings and photos move into it.",
+                    color = Muted,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                plates.forEach { p ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { keep = p.id }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = keep == p.id, onClick = { keep = p.id })
+                        Text(
+                            p.plateNumber,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text("${p.sightingCount}×", color = Muted, fontSize = 13.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onMerge(keep) }) { Text("Merge") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** "Deleted ABC1234 · Undo" bar at the bottom of the plates page. */
@@ -292,6 +361,8 @@ private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit)
 private fun PlateTimeline(
     plates: List<PlateEntity>,
     onSwipeDelete: (PlateEntity) -> Unit,
+    onDeleteMany: (List<Long>) -> Unit,
+    onMerge: (intoId: Long, fromIds: List<Long>) -> Unit,
     watches: List<WatchEntity>,
     onAddWatch: (String) -> Boolean,
     onRemoveWatch: (String) -> Unit,
@@ -326,27 +397,78 @@ private fun PlateTimeline(
             .map { Entry.Item(it) }
     }
     val newestId = plates.firstOrNull()?.id
+
+    // Multi-select: long-press a plate to start; tap to add/remove; back or ✕ to stop.
+    var selection by remember { mutableStateOf(setOf<Long>()) }
+    val selecting = selection.isNotEmpty()
+    var confirmDeleteMany by remember { mutableStateOf(false) }
+    var confirmMerge by remember { mutableStateOf(false) }
+    BackHandler(enabled = selecting) { selection = emptySet() }
+    // Drop ids of plates that no longer exist (deleted elsewhere).
+    LaunchedEffect(plates) {
+        val ids = plates.map { it.id }.toSet()
+        if (selection.any { it !in ids }) selection = selection.filter { it in ids }.toSet()
+    }
     val waiting = if (needle.isEmpty()) watches else watches.filter { needle in it.plateNumber }
     val showWaiting = sort == SortMode.Watched && waiting.isNotEmpty()
     var adding by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader(
-            title = "Plates",
-            subtitle = "${plates.size} plates · ${plates.sumOf { it.sightingCount }} sightings",
-            recording = recording,
-            recordingSince = recordingSince,
-            onBack = onBack,
-        ) {
-            IconButton(onClick = { adding = true }) {
-                Icon(painterResource(R.drawable.ic_eye), contentDescription = "Watch for a plate")
+        if (selecting) {
+            SelectionHeader(
+                count = selection.size,
+                onClose = { selection = emptySet() },
+                onMerge = { confirmMerge = true },
+                onDelete = { confirmDeleteMany = true },
+            )
+        } else {
+            PageHeader(
+                title = "Plates",
+                subtitle = "${plates.size} plates · ${plates.sumOf { it.sightingCount }} sightings",
+                recording = recording,
+                recordingSince = recordingSince,
+                onBack = onBack,
+            ) {
+                IconButton(onClick = { adding = true }) {
+                    Icon(painterResource(R.drawable.ic_eye), contentDescription = "Watch for a plate")
+                }
+                IconButton(onClick = {
+                    searching = !searching
+                    if (!searching) query = ""
+                }) {
+                    Icon(Icons.Filled.Search, contentDescription = "Search")
+                }
             }
-            IconButton(onClick = {
-                searching = !searching
-                if (!searching) query = ""
-            }) {
-                Icon(Icons.Filled.Search, contentDescription = "Search")
-            }
+        }
+
+        val selectedPlates = plates.filter { it.id in selection }
+        if (confirmDeleteMany) {
+            AlertDialog(
+                onDismissRequest = { confirmDeleteMany = false },
+                title = { Text("Delete ${selectedPlates.size} plates?") },
+                text = { Text("Their sightings and photos are deleted too. This can't be undone.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onDeleteMany(selectedPlates.map { it.id })
+                        confirmDeleteMany = false
+                        selection = emptySet()
+                    }) { Text("Delete", color = RecordRed) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmDeleteMany = false }) { Text("Cancel") }
+                },
+            )
+        }
+        if (confirmMerge && selectedPlates.size >= 2) {
+            MergeDialog(
+                plates = selectedPlates,
+                onMerge = { intoId ->
+                    onMerge(intoId, selectedPlates.map { it.id }.filter { it != intoId })
+                    confirmMerge = false
+                    selection = emptySet()
+                },
+                onDismiss = { confirmMerge = false },
+            )
         }
         // Full-width line under the header.
         HorizontalDivider(Modifier.fillMaxWidth().padding(top = 4.dp), color = LineColor)
@@ -436,16 +558,29 @@ private fun PlateTimeline(
                     val below = i < entries.lastIndex
                     when (e) {
                         is Entry.Day -> DayRow(e, above, below)
-                        is Entry.Item -> SwipeToDelete(onDelete = { onSwipeDelete(e.plate) }) {
-                            PlateRow(
-                                plate = e.plate,
-                                highlight = e.plate.id == newestId,
-                                lineAbove = above,
-                                lineBelow = below,
-                                onClick = { onSelect(e.plate) },
-                                onToggleWatch = { onToggleWatch(e.plate) },
-                                onToggleStar = { onToggleStar(e.plate) },
-                            )
+                        is Entry.Item -> {
+                            val id = e.plate.id
+                            val row: @Composable () -> Unit = {
+                                PlateRow(
+                                    plate = e.plate,
+                                    highlight = id == newestId,
+                                    lineAbove = above,
+                                    lineBelow = below,
+                                    selected = id in selection,
+                                    onClick = {
+                                        if (selecting) {
+                                            selection = if (id in selection) selection - id else selection + id
+                                        } else {
+                                            onSelect(e.plate)
+                                        }
+                                    },
+                                    onLongClick = { selection = selection + id },
+                                    onToggleWatch = { onToggleWatch(e.plate) },
+                                    onToggleStar = { onToggleStar(e.plate) },
+                                )
+                            }
+                            // No swipe-to-delete while selecting.
+                            if (selecting) row() else SwipeToDelete(onDelete = { onSwipeDelete(e.plate) }) { row() }
                         }
                     }
                 }
@@ -499,13 +634,16 @@ private fun DayRow(day: Entry.Day, lineAbove: Boolean, lineBelow: Boolean) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PlateRow(
     plate: PlateEntity,
     highlight: Boolean,
     lineAbove: Boolean,
     lineBelow: Boolean,
+    selected: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onToggleWatch: () -> Unit,
     onToggleStar: () -> Unit,
 ) {
@@ -513,7 +651,8 @@ private fun PlateRow(
         Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .clickable(onClick = onClick),
+            .background(if (selected) Accent.copy(alpha = 0.14f) else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TimelineGutter(
