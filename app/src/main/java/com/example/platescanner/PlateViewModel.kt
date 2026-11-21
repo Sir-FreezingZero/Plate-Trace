@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 /** Short message shown on the camera screen. */
 data class Notice(val text: String, val kind: Kind) {
@@ -66,13 +67,13 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
     )
     val formatRules: StateFlow<PlateRules> = _formatRules.asStateFlow()
 
-    private val _vehicleScale = MutableStateFlow(prefs.getFloat(KEY_VEHICLE_SCALE, DEFAULT_VEHICLE_SCALE))
+    private val _vehicleScale = MutableStateFlow(loadVehicleScale())
     val vehicleScale: StateFlow<Float> = _vehicleScale.asStateFlow()
 
     /** Single background thread for frame analysis; outlives camera rebinds on rotation. */
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
-    val analyzer = PlateAnalyzer { detection -> save(listOf(detection)) }
+    val analyzer = PlateAnalyzer(app) { detection -> save(listOf(detection)) }
 
     init {
         analyzer.cooldownMs = _cooldownSeconds.value * 1_000L
@@ -96,12 +97,11 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
                 _notices.tryEmit(Notice("Couldn't open that photo", Notice.Kind.INFO))
                 return@launch
             }
-            analyzer.scanStill(bitmap) { detections ->
-                if (detections.isEmpty()) {
-                    _notices.tryEmit(Notice("No plate found in photo", Notice.Kind.INFO))
-                } else {
-                    save(detections)
-                }
+            val detections = withContext(Dispatchers.Default) { analyzer.scanStill(bitmap) }
+            if (detections.isEmpty()) {
+                _notices.tryEmit(Notice("No plate found in photo", Notice.Kind.INFO))
+            } else {
+                save(detections)
             }
         }
     }
@@ -154,6 +154,15 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         PlateTextFilter.rules = rules
     }
 
+    /** Reads the car-shot setting, converting an older text-width-based value if present. */
+    private fun loadVehicleScale(): Float = when {
+        prefs.contains(KEY_VEHICLE_SCALE) -> prefs.getFloat(KEY_VEHICLE_SCALE, DEFAULT_VEHICLE_SCALE)
+        prefs.contains(KEY_VEHICLE_SCALE_V1) ->
+            // Plate text is about 3/4 of the plate's width.
+            ((prefs.getFloat(KEY_VEHICLE_SCALE_V1, 6f) * 0.75f) * 2).roundToInt() / 2f
+        else -> DEFAULT_VEHICLE_SCALE
+    }.coerceIn(2f, 9f)
+
     fun setVehicleScale(scale: Float) {
         prefs.edit().putFloat(KEY_VEHICLE_SCALE, scale).apply()
         _vehicleScale.value = scale
@@ -186,8 +195,10 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         const val KEY_COOLDOWN = "cooldown_seconds"
         const val KEY_FORMAT_MODE = "format_mode"
         const val KEY_FORMAT_MASKS = "format_masks"
-        const val KEY_VEHICLE_SCALE = "vehicle_scale"
-        const val DEFAULT_VEHICLE_SCALE = 6f
+        /** v2: multiple of the detected plate's width (v1 was of the text width). */
+        const val KEY_VEHICLE_SCALE = "vehicle_scale_v2"
+        const val KEY_VEHICLE_SCALE_V1 = "vehicle_scale"
+        const val DEFAULT_VEHICLE_SCALE = 4.5f
         val DEFAULT_MASKS = setOf("LLL0000")
     }
 }

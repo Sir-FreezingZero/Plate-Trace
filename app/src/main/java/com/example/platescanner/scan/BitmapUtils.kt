@@ -3,13 +3,20 @@ package com.example.platescanner.scan
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 internal fun Bitmap.rotated(degrees: Int): Bitmap {
     if (degrees % 360 == 0) return this
@@ -18,10 +25,9 @@ internal fun Bitmap.rotated(degrees: Int): Bitmap {
 }
 
 /**
- * Crops the text box plus a margin, so the saved image shows the whole plate rather than
- * just the characters.
+ * Crops a detected plate plus a small margin. This crop is what gets read and saved.
  */
-internal fun Bitmap.cropAround(box: Rect, padX: Float = 0.18f, padY: Float = 0.7f): Bitmap {
+internal fun Bitmap.cropAround(box: Rect, padX: Float = PLATE_PAD_X, padY: Float = PLATE_PAD_Y): Bitmap {
     val dx = (box.width() * padX).toInt()
     val dy = (box.height() * padY).toInt()
     val left = (box.left - dx).coerceIn(0, width - 1)
@@ -32,26 +38,35 @@ internal fun Bitmap.cropAround(box: Rect, padX: Float = 0.18f, padY: Float = 0.7
 }
 
 /**
- * Zoomed-out crop around a plate that should show the whole back of the car.
+ * Zoomed-out shot of the back of the car, always centred on the plate.
  *
- * There's no vehicle detector here, so the box is estimated from the plate: the plate's
- * characters are roughly 1/6 of the width of a car's rear, and the plate sits in its
- * lower part. The box is slid (not shrunk) to stay inside the frame, and the result is
- * scaled down to at most [maxSide] px.
- *
- * @param widthFactor width of the car shot as a multiple of the plate text's width
- * (Settings → Car shot framing). Larger = more zoomed out.
+ * The box is [widthFactor] × the plate box's width wide, 4:5 high, and centred on the plate.
+ * Where it runs past the edge of the frame the missing area is filled with black rather than
+ * shifting the box, so the plate stays in the middle. Scaled to at most [maxSide] px.
  */
-internal fun Bitmap.cropVehicle(textBox: Rect, widthFactor: Float = 6f, maxSide: Int = 1280): Bitmap {
-    val w = (textBox.width() * widthFactor).toInt().coerceIn(1, width)
-    val h = (w * 0.8f).toInt().coerceIn(1, height)
-    val left = (textBox.centerX() - w / 2).coerceIn(0, width - w)
-    val top = (textBox.centerY() - (h * 0.62f).toInt()).coerceIn(0, height - h)
-    val crop = Bitmap.createBitmap(this, left, top, w, h)
-    val scale = maxSide.toFloat() / maxOf(w, h)
-    return if (scale < 1f) {
-        Bitmap.createScaledBitmap(crop, (w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1), true)
-    } else crop
+internal fun Bitmap.cropVehicle(plateBox: Rect, widthFactor: Float, maxSide: Int = 1280): Bitmap {
+    val w = (plateBox.width() * widthFactor).roundToInt().coerceAtLeast(1)
+    val h = (w * 0.8f).roundToInt().coerceAtLeast(1)
+    val left = plateBox.centerX() - w / 2
+    val top = plateBox.centerY() - h / 2
+    val scale = min(1f, maxSide.toFloat() / max(w, h))
+
+    val out = Bitmap.createBitmap(
+        (w * scale).roundToInt().coerceAtLeast(1),
+        (h * scale).roundToInt().coerceAtLeast(1),
+        Bitmap.Config.ARGB_8888,
+    )
+    val canvas = Canvas(out)
+    canvas.drawColor(Color.BLACK)
+    val src = Rect(max(0, left), max(0, top), min(width, left + w), min(height, top + h))
+    if (src.width() > 0 && src.height() > 0) {
+        val dst = RectF(
+            (src.left - left) * scale, (src.top - top) * scale,
+            (src.right - left) * scale, (src.bottom - top) * scale,
+        )
+        canvas.drawBitmap(this, src, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+    }
+    return out
 }
 
 /** Loads a picked photo upright and no larger than [maxSide] px on its longest edge. */

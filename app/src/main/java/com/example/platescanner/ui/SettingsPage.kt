@@ -74,8 +74,8 @@ private val FormatPresets = listOf(
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),
 )
 
-private const val MIN_SCALE = 3f
-private const val MAX_SCALE = 12f
+private const val MIN_SCALE = 2f
+private const val MAX_SCALE = 9f
 
 /** Full-screen settings page; like the plates page, recording keeps running underneath. */
 @Composable
@@ -153,8 +153,9 @@ fun SettingsPage(
 
             SettingBlock(
                 title = "Car shot framing",
-                body = "How far the car photo zooms out around the plate. The plate crop " +
-                    "itself always stays tight. Applies to new sightings.",
+                body = "How far the car photo zooms out around the plate. The plate is " +
+                    "always in the centre, and the plate crop itself stays tight. " +
+                    "Applies to new sightings.",
             ) {
                 FramingControl(
                     scale = scale,
@@ -383,8 +384,8 @@ private fun FramingControl(scale: Float, onScaleChange: (Float) -> Unit) {
 
 /**
  * Sketch of what the car shot will contain at [scale]: the frame (same 5:4 shape as the saved
- * photo), a rough car outline, and the plate at the size and position used for cropping.
- * Approximate: assumes a typical car rear about 8× as wide as the plate's lettering.
+ * photo), a rough car outline, and the plate, centred, at the size used for cropping.
+ * Approximate: assumes a typical car rear is about 6× as wide as its plate.
  */
 @Composable
 private fun FramingPreview(scale: Float, modifier: Modifier = Modifier) {
@@ -398,13 +399,12 @@ private fun FramingPreview(scale: Float, modifier: Modifier = Modifier) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val textW = w / scale              // plate lettering width
-            val plateW = textW * 1.35f         // whole plate
+            val plateW = w / scale             // car shot = scale × plate width
             val plateH = plateW / 2f
             val plateCx = w / 2f
-            val plateCy = h * 0.62f            // same placement as cropVehicle()
+            val plateCy = h / 2f               // plate is always centred
 
-            val carW = textW * 8f
+            val carW = plateW * 6f
             val carH = carW * 0.55f
             val carLeft = plateCx - carW / 2f
             val carTop = plateCy - carH * 0.62f

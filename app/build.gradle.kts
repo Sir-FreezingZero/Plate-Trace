@@ -33,6 +33,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    androidResources {
+        // Keep the .onnx models uncompressed in the APK (faster to load).
+        noCompress.add("onnx")
+    }
     buildFeatures {
         compose = true
     }
@@ -64,8 +68,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
 
-    // On-device text recognition (model bundled in the APK, works offline)
-    implementation("com.google.mlkit:text-recognition:16.0.1")
+    // On-device plate detection + plate OCR (ONNX models bundled in assets, work offline)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 
     // Storage
     val room = "2.6.1"

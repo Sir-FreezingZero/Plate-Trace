@@ -1,18 +1,5 @@
 package com.example.platescanner.scan
 
-import android.graphics.Rect
-import com.google.mlkit.vision.text.Text
-
-/** A piece of recognised text that looks like a license plate. */
-data class PlateCandidate(
-    /** Normalised plate number: upper-case A–Z and 0–9 only, e.g. "ABC1234". */
-    val plate: String,
-    /** Text as read, e.g. "ABC-1234". */
-    val rawText: String,
-    /** Bounding box of the text in the upright frame. */
-    val box: Rect,
-)
-
 /** How strictly recognised text must look like a plate. Chosen in Settings. */
 enum class FormatMode {
     /** Anything plate-like: 4–8 letters/digits with at least one digit. */
@@ -34,7 +21,7 @@ data class PlateRules(
     val masks: List<String> = emptyList(),
 )
 
-/** Decides which lines of OCR text are probably license plates. */
+/** Decides whether text read from a plate crop is a plate number, using the Settings rules. */
 object PlateTextFilter {
 
     private val GENERIC = Regex("^[A-Z0-9]{4,8}$")
@@ -42,10 +29,6 @@ object PlateTextFilter {
 
     /** Current rules; updated from Settings, read on the analysis thread. */
     @Volatile var rules: PlateRules = PlateRules()
-
-    /** Plates are short and wide: width / height of the text line. */
-    private const val MIN_ASPECT = 1.6f
-    private const val MAX_ASPECT = 11f
 
     /** Look-alike fixes used when a mask expects a letter but OCR read a digit, and vice versa. */
     private val DIGIT_TO_LETTER = mapOf(
@@ -108,46 +91,5 @@ object PlateTextFilter {
             out.append(fixed)
         }
         return out.toString()
-    }
-
-    fun extract(text: Text): List<PlateCandidate> {
-        val result = LinkedHashMap<String, PlateCandidate>()
-        for (block in text.textBlocks) {
-            for (line in block.lines) {
-                // Try the whole line first ("ABC 1234"); if it carries extra words
-                // ("CALIFORNIA 7ABC123"), fall back to single words and adjacent word pairs.
-                val lineBox = line.boundingBox ?: continue
-                if (consider(line.text, lineBox, result)) continue
-                val els = line.elements
-                for (i in els.indices) {
-                    els[i].boundingBox?.let { consider(els[i].text, it, result) }
-                    if (i + 1 < els.size) {
-                        val a = els[i].boundingBox
-                        val b = els[i + 1].boundingBox
-                        if (a != null && b != null) {
-                            consider(els[i].text + " " + els[i + 1].text, Rect(a).apply { union(b) }, result)
-                        }
-                    }
-                }
-            }
-        }
-        return result.values.toList()
-    }
-
-    /** @return true if [text] was accepted as a plate. */
-    private fun consider(text: String, box: Rect, out: MutableMap<String, PlateCandidate>): Boolean {
-        val raw = text.trim()
-        if (box.height() <= 0) return false
-
-        // Plates have at most a couple of separators and are written in capitals.
-        if (raw.count { it == ' ' } > 2) return false
-        if (raw.count { it.isLowerCase() } > 1) return false
-
-        val aspect = box.width().toFloat() / box.height()
-        if (aspect < MIN_ASPECT || aspect > MAX_ASPECT) return false
-
-        val plate = accept(normalize(raw)) ?: return false
-        if (plate !in out) out[plate] = PlateCandidate(plate, raw, Rect(box))
-        return true
     }
 }

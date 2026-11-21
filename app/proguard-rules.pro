@@ -1,1 +1,1 @@
-# Default rules are sufficient; ML Kit, CameraX and Room ship their own consumer rules.
+# Default rules are sufficient; ONNX Runtime, CameraX and Room ship their own consumer rules.
