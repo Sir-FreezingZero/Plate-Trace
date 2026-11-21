@@ -53,6 +53,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import com.example.platescanner.scan.PlateTracker
@@ -146,6 +150,21 @@ fun PlatesPage(
 
     val toggleStar: (PlateEntity) -> Unit = { plate -> viewModel.setStarred(plate.id, !plate.starred) }
 
+    // Swipe-to-delete with undo: the plate is hidden at once and really deleted ~4 s later
+    // unless Undo is tapped. A new swipe commits any previous pending delete first.
+    var pendingDelete by remember { mutableStateOf<PlateEntity?>(null) }
+    val swipeDelete: (PlateEntity) -> Unit = { plate ->
+        pendingDelete?.let { viewModel.delete(it.id) }
+        pendingDelete = plate
+    }
+    LaunchedEffect(pendingDelete) {
+        val p = pendingDelete ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(4_000)
+        viewModel.delete(p.id)
+        pendingDelete = null
+    }
+    val shownPlates = pendingDelete?.let { gone -> plates.filter { it.id != gone.id } } ?: plates
+
     val toggleWatch: (PlateEntity) -> Unit = { plate ->
         val turningOn = !plate.watched
         if (turningOn && Build.VERSION.SDK_INT >= 33 && !WatchAlerts.canNotify(context)) {
@@ -155,6 +174,7 @@ fun PlatesPage(
     }
 
     FullPage(visible = visible) {
+      Box(Modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = selectedId,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -162,7 +182,8 @@ fun PlatesPage(
         ) { id ->
             if (id == null) {
                 PlateTimeline(
-                    plates = plates,
+                    plates = shownPlates,
+                    onSwipeDelete = swipeDelete,
                     watches = watches,
                     onAddWatch = { text ->
                         val ok = viewModel.addWatch(text)
@@ -189,10 +210,77 @@ fun PlatesPage(
                 )
             }
         }
+
+        pendingDelete?.let { p ->
+            UndoBar(
+                text = "Deleted ${p.plateNumber}",
+                onUndo = { pendingDelete = null },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+      }
     }
 
     BackHandler(enabled = visible && selectedId != null) { selectedId = null }
-    LaunchedEffect(visible) { if (!visible) selectedId = null }
+    LaunchedEffect(visible) {
+        if (!visible) {
+            selectedId = null
+            // Leaving the page commits a pending delete.
+            pendingDelete?.let { viewModel.delete(it.id) }
+            pendingDelete = null
+        }
+    }
+}
+
+/** "Deleted ABC1234 · Undo" bar at the bottom of the plates page. */
+@Composable
+private fun UndoBar(text: String, onUndo: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .padding(12.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF26292E))
+            .padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        TextButton(onClick = onUndo) { Text("Undo", color = Accent, fontWeight = FontWeight.SemiBold) }
+    }
+}
+
+/** Swipe a row right-to-left to delete it; a red background with a trash icon shows behind. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit) {
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                true
+            } else {
+                false
+            }
+        },
+        positionalThreshold = { distance -> distance * 0.4f },
+    )
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(RecordRed.copy(alpha = 0.85f))
+                    .padding(end = 20.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White)
+            }
+        },
+    ) {
+        Box(Modifier.background(PageColor)) { content() }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -202,6 +290,7 @@ fun PlatesPage(
 @Composable
 private fun PlateTimeline(
     plates: List<PlateEntity>,
+    onSwipeDelete: (PlateEntity) -> Unit,
     watches: List<WatchEntity>,
     onAddWatch: (String) -> Boolean,
     onRemoveWatch: (String) -> Unit,
@@ -346,15 +435,17 @@ private fun PlateTimeline(
                     val below = i < entries.lastIndex
                     when (e) {
                         is Entry.Day -> DayRow(e, above, below)
-                        is Entry.Item -> PlateRow(
-                            plate = e.plate,
-                            highlight = e.plate.id == newestId,
-                            lineAbove = above,
-                            lineBelow = below,
-                            onClick = { onSelect(e.plate) },
-                            onToggleWatch = { onToggleWatch(e.plate) },
-                            onToggleStar = { onToggleStar(e.plate) },
-                        )
+                        is Entry.Item -> SwipeToDelete(onDelete = { onSwipeDelete(e.plate) }) {
+                            PlateRow(
+                                plate = e.plate,
+                                highlight = e.plate.id == newestId,
+                                lineAbove = above,
+                                lineBelow = below,
+                                onClick = { onSelect(e.plate) },
+                                onToggleWatch = { onToggleWatch(e.plate) },
+                                onToggleStar = { onToggleStar(e.plate) },
+                            )
+                        }
                     }
                 }
             }

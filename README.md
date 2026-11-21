@@ -20,7 +20,7 @@ The whole screen is the camera, with one row of controls along the bottom:
 | Big round button (centre) | Tap to start / stop recording (a red timer shows at the top). The icon shows the mode: video camera or photo camera. **Press and hold** to switch between video and photo mode |
 | Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
 | Other bar buttons | Spare, not used yet |
-| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen, or only watched plates), with search. Tap a bell to watch a plate, or the star to keep it from being auto-deleted. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
+| ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen, or only watched plates), with search. Tap a bell to watch a plate, or the star to keep it from being auto-deleted. Swipe a plate left to delete it (Undo for 4 seconds). Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |
 
 When a plate is saved its number flashes at the top (green = new plate, dark = seen before) and the ☰ button pulses.
 
