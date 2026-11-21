@@ -70,6 +70,7 @@ private val FormatPresets = listOf(
     FormatPreset("LLL0000", "ABC 1234", "NY, PA, TX and many others"),
     FormatPreset("0LLL000", "1ABC234", "California"),
     FormatPreset("L00LLL", "A12 BCD", "New Jersey"),
+    FormatPreset("LLL00L", "ABC 12D", "Older New Jersey"),
     FormatPreset("LLL000", "ABC 123", "3 letters, 3 numbers"),
     FormatPreset("000LLL", "123 ABC", "3 numbers, 3 letters"),
     FormatPreset("LL00000", "AB 12345", "2 letters, 5 numbers"),

@@ -33,9 +33,10 @@ class PlateRepository(context: Context) {
     fun sightings(plateId: Long): Flow<List<SightingEntity>> = dao.observeSightings(plateId)
 
     /** @return whether the plate is new and whether it's on the watch list. */
-    suspend fun save(plateNumber: String, rawText: String, crop: Bitmap, vehicle: Bitmap): SaveResult =
+    suspend fun save(read: String, rawText: String, crop: Bitmap, vehicle: Bitmap): SaveResult =
         withContext(Dispatchers.IO) {
             val timestamp = System.currentTimeMillis()
+            val plateNumber = resolvePlate(read, timestamp)
             val plateFile = File(imageDir, "${plateNumber}_$timestamp.jpg")
             FileOutputStream(plateFile).use { crop.compress(Bitmap.CompressFormat.JPEG, 92, it) }
             val vehicleFile = File(imageDir, "${plateNumber}_${timestamp}_vehicle.jpg")
@@ -62,6 +63,24 @@ class PlateRepository(context: Context) {
         dao.setWatched(plateId, watched)
     }
 
+    /**
+     * A reading that isn't an existing plate but is nearly identical to one seen in the last
+     * [MERGE_WINDOW_MS] (one or two characters off, or look-alikes like 0/O) is almost always a
+     * misread of that same car, so it's saved onto that plate instead of creating a new one.
+     */
+    private suspend fun resolvePlate(read: String, now: Long): String {
+        if (dao.findByNumber(read) != null) return read
+        return dao.platesSeenSince(now - MERGE_WINDOW_MS)
+            .filter { PlateTracker.similar(it.plateNumber, read, loose = true) }
+            .maxByOrNull { it.sightingCount }
+            ?.plateNumber
+            ?: read
+    }
+
+    suspend fun merge(fromId: Long, intoId: Long) = withContext(Dispatchers.IO) {
+        dao.merge(fromId, intoId)
+    }
+
     suspend fun setStarred(plateId: Long, starred: Boolean) = withContext(Dispatchers.IO) {
         dao.setStarred(plateId, starred)
     }
@@ -76,5 +95,9 @@ class PlateRepository(context: Context) {
     suspend fun deleteAll() = withContext(Dispatchers.IO) {
         dao.deleteEverything()
         imageDir.listFiles()?.forEach { it.delete() }
+    }
+
+    private companion object {
+        const val MERGE_WINDOW_MS = 30 * 60_000L
     }
 }

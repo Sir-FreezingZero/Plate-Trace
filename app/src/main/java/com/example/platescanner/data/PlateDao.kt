@@ -9,7 +9,7 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Outcome of saving a sighting. */
-data class SaveResult(val isNew: Boolean, val watched: Boolean)
+data class SaveResult(val isNew: Boolean, val watched: Boolean, val plateNumber: String = "")
 
 @Dao
 abstract class PlateDao {
@@ -25,6 +25,38 @@ abstract class PlateDao {
 
     @Query("DELETE FROM watches WHERE plateNumber = :plateNumber")
     abstract suspend fun deleteWatch(plateNumber: String)
+
+    @Query("SELECT * FROM plates WHERE lastSeen >= :since")
+    abstract suspend fun platesSeenSince(since: Long): List<PlateEntity>
+
+    @Query("SELECT * FROM plates WHERE id = :id")
+    abstract suspend fun plateById(id: Long): PlateEntity?
+
+    @Query("UPDATE sightings SET plateId = :intoId WHERE plateId = :fromId")
+    abstract suspend fun moveSightings(fromId: Long, intoId: Long)
+
+    /** Moves all of [fromId]'s sightings onto [intoId] and removes [fromId]. */
+    @Transaction
+    open suspend fun merge(fromId: Long, intoId: Long) {
+        if (fromId == intoId) return
+        val from = plateById(fromId) ?: return
+        val into = plateById(intoId) ?: return
+        moveSightings(fromId, intoId)
+        val fromIsNewer = from.lastSeen > into.lastSeen
+        updatePlate(
+            into.copy(
+                sightingCount = into.sightingCount + from.sightingCount,
+                firstSeen = minOf(into.firstSeen, from.firstSeen),
+                lastSeen = maxOf(into.lastSeen, from.lastSeen),
+                latestImagePath = if (fromIsNewer) from.latestImagePath else into.latestImagePath,
+                latestVehicleImagePath =
+                    if (fromIsNewer) from.latestVehicleImagePath else into.latestVehicleImagePath,
+                watched = into.watched || from.watched,
+                starred = into.starred || from.starred,
+            )
+        )
+        deletePlateRow(fromId)
+    }
 
     @Query("UPDATE plates SET starred = :starred WHERE id = :id")
     abstract suspend fun setStarred(id: Long, starred: Boolean)
@@ -121,7 +153,11 @@ abstract class PlateDao {
                 rawText = rawText,
             )
         )
-        return SaveResult(isNew = isNew, watched = existing?.watched == true || markWatched)
+        return SaveResult(
+            isNew = isNew,
+            watched = existing?.watched == true || markWatched,
+            plateNumber = number,
+        )
     }
 
     @Query("DELETE FROM sightings")

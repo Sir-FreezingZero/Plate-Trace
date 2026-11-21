@@ -218,16 +218,18 @@ class PlateTracker {
 
         /**
          * True if two reads are probably the same plate: after folding look-alike characters,
-         * they differ by at most one edit (two for reads of 7+ characters), or one is
-         * contained in the other (a partial read).
+         * they differ by at most one edit (two for reads of 7+ characters, or 6+ when [loose]),
+         * or one is contained in the other (a partial read).
          */
-        fun similar(a: String, b: String): Boolean {
+        fun similar(a: String, b: String, loose: Boolean = false): Boolean {
             if (a == b) return true
             val x = fold(a)
             val y = fold(b)
             if (x == y) return true
             if (minOf(x.length, y.length) >= 4 && (x.contains(y) || y.contains(x))) return true
-            val allowed = if (maxOf(x.length, y.length) >= 7) 2 else 1
+            val longest = maxOf(x.length, y.length)
+            // loose (used for merging saved plates): two differences already from 6 characters.
+            val allowed = if (longest >= 7 || (loose && longest >= 6)) 2 else 1
             if (abs(x.length - y.length) > allowed) return false
             return editDistance(x, y) <= allowed
         }

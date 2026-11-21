@@ -50,6 +50,9 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 - **Show live readings:** while recording, draws a box around every plate the detector finds, with a strip on top showing the plate number read in that frame and a strip underneath showing status only: `2/3` (matching readings), `saved`, `unsure`, or `—` (not a plate format). White while reading, green once saved, amber when rejected. Also shows the image size being read and how long each one takes. Useful for checking why a plate is misread.
 - **Car shot framing:** how far the car photo zooms out around the plate (2×–9× the plate's width), with a preview. The plate is always centred; the plate crop is unaffected.
 
+### Duplicate misreads
+A reading that isn't an existing plate but is nearly identical to one seen in the last 30 minutes (look-alike characters, or one or two characters off) is saved onto that plate rather than as a new one. For older duplicates, a plate's detail page lists **similar plates**; tap one to merge its sightings and photos into the plate you're viewing.
+
 ### Watch list
 Tap the bell on any plate (in the list or on its detail page) to watch it. When a watched plate is seen again the phone vibrates, an amber banner appears over everything, and a notification with the car photo is posted (Android 13+ asks for notification permission the first time). Use the **Watched** filter on the Plates page to see only watched plates.
 

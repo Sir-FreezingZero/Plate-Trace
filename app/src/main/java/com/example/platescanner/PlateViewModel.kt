@@ -159,6 +159,11 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Moves [fromId]'s sightings onto [intoId] (for misread duplicates) and removes [fromId]. */
+    fun merge(fromId: Long, intoId: Long) {
+        viewModelScope.launch { repository.merge(fromId, intoId) }
+    }
+
     fun setStarred(plateId: Long, starred: Boolean) {
         viewModelScope.launch { repository.setStarred(plateId, starred) }
     }
@@ -254,16 +259,17 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
                     val result = repository.save(d.plate, d.rawText, d.crop, d.vehicle)
                     // Also alert for a reading that differs from a watched plate only by
                     // look-alike characters (0/O, 8/B …).
-                    val folded = PlateTracker.fold(d.plate)
+                    val plate = result.plateNumber.ifEmpty { d.plate } // may be an existing spelling
+                    val folded = PlateTracker.fold(plate)
                     val watched = result.watched || plates.value.any {
                         it.watched && PlateTracker.fold(it.plateNumber) == folded
                     }
                     if (watched) {
-                        WatchAlerts.alert(getApplication<Application>(), d.plate, d.vehicle)
-                        _notices.tryEmit(Notice(d.plate, Notice.Kind.WATCH))
+                        WatchAlerts.alert(getApplication<Application>(), plate, d.vehicle)
+                        _notices.tryEmit(Notice(plate, Notice.Kind.WATCH))
                     } else {
                         val kind = if (result.isNew) Notice.Kind.NEW_PLATE else Notice.Kind.REPEAT_PLATE
-                        _notices.tryEmit(Notice(d.plate, kind))
+                        _notices.tryEmit(Notice(plate, kind))
                     }
                 } catch (t: Throwable) {
                     Log.e("PlateViewModel", "Could not save ${d.plate}", t)

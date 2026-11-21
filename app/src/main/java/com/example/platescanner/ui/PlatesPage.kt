@@ -43,7 +43,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.filled.Search
@@ -54,6 +53,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import com.example.platescanner.scan.PlateTracker
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
@@ -460,12 +462,7 @@ private fun PlateRow(
         }
         StarButton(starred = plate.starred, onClick = onToggleStar)
         WatchButton(watched = plate.watched, onClick = onToggleWatch)
-        Icon(
-            Icons.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = Muted,
-            modifier = Modifier.padding(end = 8.dp).size(20.dp),
-        )
+        Spacer(Modifier.width(4.dp))
     }
 }
 
@@ -678,6 +675,11 @@ private fun PlateDetail(
     var loaded by remember(plateId) { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<SightingEntity?>(null) }
+    var mergeCandidate by remember { mutableStateOf<PlateEntity?>(null) }
+    val allPlates by viewModel.plates.collectAsStateWithLifecycle()
+    val similar = plate?.let { p ->
+        allPlates.filter { it.id != p.id && PlateTracker.similar(it.plateNumber, p.plateNumber, loose = true) }
+    } ?: emptyList()
 
     // If the plate disappears (deleted), go back to the list.
     LaunchedEffect(plate) {
@@ -757,6 +759,40 @@ private fun PlateDetail(
                 }
             }
 
+            if (similar.isNotEmpty()) {
+                item(key = "similar") {
+                    Column(Modifier.padding(bottom = 12.dp)) {
+                        Text(
+                            "SIMILAR PLATES · LIKELY MISREADS · TAP TO MERGE",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            similar.forEach { other ->
+                                Text(
+                                    "${other.plateNumber} · ${other.sightingCount}×",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(FieldColor)
+                                        .border(1.dp, LineColor, RoundedCornerShape(6.dp))
+                                        .clickable { mergeCandidate = other }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             item(key = "historyHeader") {
                 Text(
                     "HISTORY",
@@ -777,6 +813,31 @@ private fun PlateDetail(
                     onClick = { viewing = s },
                 )
             }
+        }
+    }
+
+    mergeCandidate?.let { other ->
+        val into = plate
+        if (into != null) {
+            AlertDialog(
+                onDismissRequest = { mergeCandidate = null },
+                title = { Text("Merge ${other.plateNumber} into ${into.plateNumber}?") },
+                text = {
+                    Text(
+                        "Its ${other.sightingCount} sighting(s) and photos move to ${into.plateNumber}, " +
+                            "and ${other.plateNumber} is removed."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.merge(other.id, into.id)
+                        mergeCandidate = null
+                    }) { Text("Merge") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { mergeCandidate = null }) { Text("Cancel") }
+                },
+            )
         }
     }
 
