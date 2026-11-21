@@ -39,6 +39,12 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.example.platescanner.CaptureMode
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.Crossfade
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -169,6 +175,8 @@ fun ScannerScreen(viewModel: PlateViewModel) {
             onSettings = { openPanel = OpenPanel.Settings },
             onMenu = { openPanel = OpenPanel.Plates },
             onRecord = viewModel::toggleRecording,
+            captureMode = captureMode,
+            onSwitchMode = viewModel::toggleCaptureMode,
             onPickPhoto = {
                 pickPhoto.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -248,6 +256,8 @@ private fun BottomControls(
     onSettings: () -> Unit,
     onMenu: () -> Unit,
     onRecord: () -> Unit,
+    captureMode: CaptureMode,
+    onSwitchMode: () -> Unit,
     onPickPhoto: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -282,7 +292,7 @@ private fun BottomControls(
                 BarDivider()
                 BarButton(onClick = {}) {}     // spare
             }
-            RecordButton(recording = recording, onClick = onRecord)
+            RecordButton(recording = recording, mode = captureMode, onClick = onRecord, onLongPress = onSwitchMode)
         }
 
         Spacer(Modifier.weight(1f))
@@ -354,11 +364,21 @@ private fun BarDivider() {
     )
 }
 
-/** Big dark circle; red dot when idle, red square while recording. */
+/**
+ * Big dark circle with a red centre: a circle when idle, a rounded square while recording.
+ * The centre shows the capture mode (video camera or photo camera). Tap to start/stop;
+ * press and hold to switch between video and photo mode.
+ */
 @Composable
-private fun RecordButton(recording: Boolean, onClick: () -> Unit) {
-    val innerSize by animateDpAsState(if (recording) 24.dp else 28.dp, label = "recSize")
-    val corner by animateDpAsState(if (recording) 6.dp else 14.dp, label = "recCorner")
+private fun RecordButton(
+    recording: Boolean,
+    mode: CaptureMode,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val innerSize by animateDpAsState(if (recording) 36.dp else 44.dp, label = "recSize")
+    val corner by animateDpAsState(if (recording) 9.dp else 22.dp, label = "recCorner")
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .size(68.dp)
@@ -366,9 +386,18 @@ private fun RecordButton(recording: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .background(Color(0xFF111111))
             .border(3.dp, Color.White, CircleShape)
-            .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongPress()
+                    },
+                )
+            }
             .semantics {
-                contentDescription = if (recording) "Stop recording" else "Start recording"
+                contentDescription = (if (recording) "Stop recording" else "Start recording") +
+                    ", " + (if (mode == CaptureMode.VIDEO) "video" else "photo") + " mode"
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -376,8 +405,18 @@ private fun RecordButton(recording: Boolean, onClick: () -> Unit) {
             Modifier
                 .size(innerSize)
                 .clip(RoundedCornerShape(corner))
-                .background(RecordRed)
-        )
+                .background(RecordRed),
+            contentAlignment = Alignment.Center,
+        ) {
+            Crossfade(targetState = mode, label = "modeIcon") { m ->
+                Icon(
+                    painterResource(if (m == CaptureMode.VIDEO) R.drawable.ic_videocam else R.drawable.ic_photo_camera),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
     }
 }
 

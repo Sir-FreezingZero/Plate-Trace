@@ -17,7 +17,7 @@ The whole screen is the camera, with one row of controls along the bottom:
 | Control | What it does |
 |---|---|
 | ⚙ (bottom left) | Opens the Settings page: plate format, how soon the same plate is saved again, car shot framing, saved-data summary, delete all plates. Recording keeps running while it's open |
-| Big round button (centre) | Start / stop recording. Plates are only captured while recording; a red timer shows at the top |
+| Big round button (centre) | Tap to start / stop recording (a red timer shows at the top). The icon shows the mode: video camera or photo camera. **Press and hold** to switch between video and photo mode |
 | Photo button (left end of the bar) | Pick a photo from your gallery and scan it for plates (handy for testing without driving) |
 | Other bar buttons | Spare, not used yet |
 | ☰ (bottom right) | Opens the Plates page: a timeline of saved plates grouped by day (or sorted by most seen, or only watched plates), with search. Tap a bell to watch a plate. Tap one for its car and plate shots and sighting history. Recording keeps running while the page is open |

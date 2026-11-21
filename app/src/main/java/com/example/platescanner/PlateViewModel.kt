@@ -135,6 +135,13 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         applyCapture()
     }
 
+    /** Record button long-press: switch between video and photo mode. */
+    fun toggleCaptureMode() {
+        val next = if (_captureMode.value == CaptureMode.VIDEO) CaptureMode.PHOTO else CaptureMode.VIDEO
+        setCaptureMode(next)
+        _notices.tryEmit(Notice(if (next == CaptureMode.VIDEO) "Video mode" else "Photo mode", Notice.Kind.INFO))
+    }
+
     fun setPhotoInterval(ms: Long) {
         prefs.edit().putLong(KEY_PHOTO_INTERVAL, ms).apply()
         _photoIntervalMs.value = ms
