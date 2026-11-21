@@ -71,6 +71,9 @@ import kotlinx.coroutines.launch
 private val Glass = Color.Black.copy(alpha = 0.55f)
 private val GlassBorder = Color.White.copy(alpha = 0.25f)
 
+/** Every control button (settings, bar buttons, menu) is this size; only Record is bigger. */
+private val ButtonSize = 48.dp
+
 private enum class OpenPanel { None, Settings, Plates }
 
 @Composable
@@ -258,7 +261,7 @@ private fun BottomControls(
         Box(contentAlignment = Alignment.Center) {
             Row(
                 Modifier
-                    .height(48.dp)
+                    .height(ButtonSize)
                     .clip(RoundedCornerShape(50))
                     .background(Glass)
                     .border(1.dp, GlassBorder, RoundedCornerShape(50)),
@@ -319,7 +322,7 @@ private fun RoundButton(
 ) {
     Box(
         modifier = modifier
-            .size(44.dp)
+            .size(ButtonSize)
             .shadow(6.dp, CircleShape)
             .clip(CircleShape)
             .background(Glass)
@@ -334,8 +337,7 @@ private fun RoundButton(
 private fun BarButton(onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
     Box(
         modifier = Modifier
-            .width(42.dp)
-            .height(48.dp)
+            .size(ButtonSize)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
         content = content,
