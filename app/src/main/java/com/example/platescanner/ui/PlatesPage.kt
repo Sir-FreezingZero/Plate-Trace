@@ -54,7 +54,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.rememberPagerState
@@ -329,7 +328,7 @@ private fun UndoBar(text: String, onUndo: () -> Unit, modifier: Modifier = Modif
 /** Swipe a row right-to-left to delete it; a red background with a trash icon shows behind. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SwipeToDelete(onDelete: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit) {
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
@@ -355,9 +354,8 @@ private fun SwipeToDelete(onDelete: () -> Unit, modifier: Modifier = Modifier, c
                 Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White)
             }
         },
-        modifier = modifier,
     ) {
-        Box(Modifier.background(PanelBg)) { content() }
+        Box(Modifier.background(PageColor)) { content() }
     }
 }
 
@@ -528,18 +526,34 @@ private fun PlateTimeline(
             entries.isEmpty() && !showWaiting ->
                 EmptyState("No matches", "No saved plate contains \"$needle\".")
             else -> LazyColumn(
-                contentPadding = PaddingValues(start = 6.dp, end = 12.dp, top = 0.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (showWaiting) {
-                    item(key = "waiting_header") { GroupLabel("Waiting for") }
-                    itemsIndexed(waiting, key = { _, w -> "w_" + w.plateNumber }) { wi, w ->
-                        Box(Modifier.panelRow(first = wi == 0, last = wi == waiting.lastIndex)) {
-                            WaitingRow(w, onRemove = { onRemoveWatch(w.plateNumber) })
-                        }
+                    item(key = "waiting_header") {
+                        Text(
+                            "WAITING FOR",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(start = 34.dp, top = 6.dp, bottom = 2.dp),
+                        )
+                    }
+                    items(waiting, key = { "w_" + it.plateNumber }) { w ->
+                        WaitingRow(w, onRemove = { onRemoveWatch(w.plateNumber) })
                     }
                     if (entries.isNotEmpty()) {
-                        item(key = "seen_header") { GroupLabel("Seen") }
+                        item(key = "seen_header") {
+                            Text(
+                                "SEEN",
+                                color = Muted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(start = 34.dp, top = 12.dp, bottom = 2.dp),
+                            )
+                        }
                     }
                 }
                 itemsIndexed(
@@ -571,25 +585,8 @@ private fun PlateTimeline(
                                     onToggleStar = { onToggleStar(e.plate) },
                                 )
                             }
-                            val first = i == 0 || entries[i - 1] is Entry.Day
-                            val last = i == entries.lastIndex || entries[i + 1] is Entry.Day
-                            val dot = when {
-                                e.plate.watched -> Dot.Watched
-                                id == newestId -> Dot.Highlight
-                                else -> Dot.Small
-                            }
-                            // Timeline on the left, the plate's panel row beside it. Only the
-                            // panel moves when swiped. No swipe-to-delete while selecting.
-                            Box(Modifier.fillMaxWidth().timeline(dot, above, below)) {
-                                if (selecting) {
-                                    Box(Modifier.panelRow(first, last)) { row() }
-                                } else {
-                                    SwipeToDelete(
-                                        onDelete = { onSwipeDelete(e.plate) },
-                                        modifier = Modifier.panelRow(first, last),
-                                    ) { row() }
-                                }
-                            }
+                            // No swipe-to-delete while selecting.
+                            if (selecting) row() else SwipeToDelete(onDelete = { onSwipeDelete(e.plate) }) { row() }
                         }
                     }
                 }
@@ -599,35 +596,6 @@ private fun PlateTimeline(
 }
 
 private enum class Dot { Small, Highlight, Watched, Ring, RingAccent }
-
-private val GutterWidth = 28.dp
-
-/**
- * Draws the timeline in a [GutterWidth]-wide strip on the left of this item (line through the
- * full height, dot centred) and pads the content past it.
- */
-private fun Modifier.timeline(dot: Dot, lineAbove: Boolean, lineBelow: Boolean): Modifier = this
-    .drawBehind {
-        val cx = GutterWidth.toPx() / 2
-        val cy = size.height / 2
-        val stroke = 1.dp.toPx()
-        if (lineAbove) drawLine(LineColor, Offset(cx, 0f), Offset(cx, cy), stroke)
-        if (lineBelow) drawLine(LineColor, Offset(cx, cy), Offset(cx, size.height), stroke)
-        val c = Offset(cx, cy)
-        when (dot) {
-            Dot.Small -> drawCircle(DotColor, 4.dp.toPx(), c)
-            Dot.Highlight -> drawCircle(Accent, 5.dp.toPx(), c)
-            Dot.Watched -> drawCircle(WatchAmber, 5.dp.toPx(), c)
-            Dot.Ring, Dot.RingAccent -> {
-                drawCircle(PageColor, 6.dp.toPx(), c)
-                drawCircle(
-                    if (dot == Dot.RingAccent) Accent else DotColor,
-                    5.dp.toPx(), c, style = Stroke(2.dp.toPx()),
-                )
-            }
-        }
-    }
-    .padding(start = GutterWidth)
 
 /** Vertical timeline line with a dot centred on the row. */
 @Composable
@@ -656,48 +624,21 @@ private fun TimelineGutter(dot: Dot, lineAbove: Boolean, lineBelow: Boolean) {
 
 @Composable
 private fun DayRow(day: Entry.Day, lineAbove: Boolean, lineBelow: Boolean) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .timeline(if (day.isToday) Dot.RingAccent else Dot.Ring, lineAbove, lineBelow)
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        GroupLabel(day.label, Modifier.padding(bottom = 0.dp))
-    }
-}
-
-/** Small uppercase label above a panel ("TODAY", "WAITING FOR", "HISTORY"). */
-@Composable
-private fun GroupLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text.uppercase(),
-        color = Muted,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.sp,
-        modifier = modifier.padding(start = 14.dp, top = 14.dp, bottom = 6.dp),
-    )
-}
-
-/**
- * One row of a rounded panel: rounded top corners on the first row, bottom corners on the
- * last, and a fine line above every row but the first.
- */
-private fun Modifier.panelRow(first: Boolean, last: Boolean): Modifier = this
-    .clip(
-        RoundedCornerShape(
-            topStart = if (first) 10.dp else 0.dp,
-            topEnd = if (first) 10.dp else 0.dp,
-            bottomStart = if (last) 10.dp else 0.dp,
-            bottomEnd = if (last) 10.dp else 0.dp,
+        TimelineGutter(if (day.isToday) Dot.RingAccent else Dot.Ring, lineAbove, lineBelow)
+        Text(
+            day.label.uppercase(),
+            color = Muted,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 6.dp, top = 10.dp, bottom = 6.dp),
         )
-    )
-    .background(PanelBg)
-    .drawBehind {
-        if (!first) {
-            val inset = 12.dp.toPx()
-            drawLine(RowLine, Offset(inset, 0f), Offset(size.width - inset, 0f), 1f)
-        }
     }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -720,7 +661,15 @@ private fun PlateRow(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(Modifier.width(10.dp))
+        TimelineGutter(
+            when {
+                plate.watched -> Dot.Watched
+                highlight -> Dot.Highlight
+                else -> Dot.Small
+            },
+            lineAbove,
+            lineBelow,
+        )
         AsyncImage(
             model = File(plate.latestVehicleImagePath ?: plate.latestImagePath),
             contentDescription = null,
@@ -760,8 +709,8 @@ private fun WaitingRow(watch: WatchEntity, onRemove: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 14.dp, end = 4.dp)
-            .height(52.dp),
+            .padding(start = 34.dp, end = 8.dp)
+            .height(44.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -1035,10 +984,7 @@ private fun PlateDetail(
             item(key = "stats") {
                 Row(
                     Modifier
-                        .padding(top = 12.dp)
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(PanelBg)
                         .padding(vertical = 12.dp)
                         .height(IntrinsicSize.Min),
                 ) {
@@ -1059,7 +1005,7 @@ private fun PlateDetail(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.sp,
-                            modifier = Modifier.padding(start = 14.dp, top = 14.dp, bottom = 6.dp),
+                            modifier = Modifier.padding(bottom = 6.dp),
                         )
                         Row(
                             Modifier.horizontalScroll(rememberScrollState()),
@@ -1087,33 +1033,35 @@ private fun PlateDetail(
             val last = sightings.firstOrNull { it.latitude != null }
             item(key = "location") {
                 if (last == null) {
-                    Column(Modifier.padding(bottom = 2.dp)) {
-                        GroupLabel("Last location")
+                    Column(Modifier.padding(bottom = 12.dp)) {
+                        Text(
+                            "LAST LOCATION",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
                         Text(
                             "Not recorded yet. New sightings save it while recording with location on.",
                             color = Muted,
                             fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(PanelBg)
-                                .padding(14.dp),
                         )
                     }
                 } else {
-                    Column(Modifier.padding(bottom = 2.dp)) {
-                        GroupLabel("Last location")
+                    Column(Modifier.padding(bottom = 12.dp)) {
+                        Text(
+                            "LAST LOCATION",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
                         // Selectable so the coordinates can be copied.
                         SelectionContainer {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(PanelBg)
-                                    .padding(14.dp),
-                            ) {
-                                placeText(last)?.let { Text(it, fontSize = 14.sp, lineHeight = 18.sp) }
+                            Column {
+                                placeText(last)?.let { Text(it, fontSize = 14.sp) }
                                 Text(
                                     coordsText(last) ?: "",
                                     color = Muted,
@@ -1126,18 +1074,25 @@ private fun PlateDetail(
                 }
             }
 
-            item(key = "historyHeader") { GroupLabel("History") }
+            item(key = "historyHeader") {
+                Text(
+                    "HISTORY",
+                    color = Muted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
 
             itemsIndexed(sightings, key = { _, s -> s.id }) { i, s ->
-                Box(Modifier.panelRow(first = i == 0, last = i == sightings.lastIndex)) {
-                    SightingRow(
-                        s,
-                        lineAbove = i > 0,
-                        lineBelow = i < sightings.lastIndex,
-                        highlight = i == 0,
-                        onClick = { viewingIndex = i },
-                    )
-                }
+                SightingRow(
+                    s,
+                    lineAbove = i > 0,
+                    lineBelow = i < sightings.lastIndex,
+                    highlight = i == 0,
+                    onClick = { viewingIndex = i },
+                )
             }
         }
     }
@@ -1199,7 +1154,7 @@ private fun SightingRow(
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(Modifier.width(6.dp))
+        TimelineGutter(if (highlight) Dot.Highlight else Dot.Small, lineAbove, lineBelow)
         Column(
             Modifier
                 .weight(1f)
@@ -1252,7 +1207,6 @@ private fun SightingRow(
                 .clip(RoundedCornerShape(6.dp))
                 .background(ThumbBackground),
         )
-        Spacer(Modifier.width(10.dp))
     }
 }
 
