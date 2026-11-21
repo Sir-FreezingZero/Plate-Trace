@@ -54,6 +54,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.example.platescanner.data.WatchEntity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -124,6 +130,13 @@ fun PlatesPage(
         ActivityResultContracts.RequestPermission()
     ) { /* alerts still vibrate and show in-app if denied */ }
 
+    val watches by viewModel.watches.collectAsStateWithLifecycle()
+    val askNotifications = {
+        if (Build.VERSION.SDK_INT >= 33 && !WatchAlerts.canNotify(context)) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     val toggleWatch: (PlateEntity) -> Unit = { plate ->
         val turningOn = !plate.watched
         if (turningOn && Build.VERSION.SDK_INT >= 33 && !WatchAlerts.canNotify(context)) {
@@ -141,6 +154,13 @@ fun PlatesPage(
             if (id == null) {
                 PlateTimeline(
                     plates = plates,
+                    watches = watches,
+                    onAddWatch = { text ->
+                        val ok = viewModel.addWatch(text)
+                        if (ok) askNotifications()
+                        ok
+                    },
+                    onRemoveWatch = viewModel::removeWatch,
                     recording = recording,
                     recordingSince = recordingSince,
                     onSelect = { selectedId = it.id },
@@ -171,6 +191,9 @@ fun PlatesPage(
 @Composable
 private fun PlateTimeline(
     plates: List<PlateEntity>,
+    watches: List<WatchEntity>,
+    onAddWatch: (String) -> Boolean,
+    onRemoveWatch: (String) -> Unit,
     recording: Boolean,
     recordingSince: Long,
     onSelect: (PlateEntity) -> Unit,
@@ -201,6 +224,9 @@ private fun PlateTimeline(
             .map { Entry.Item(it) }
     }
     val newestId = plates.firstOrNull()?.id
+    val waiting = if (needle.isEmpty()) watches else watches.filter { needle in it.plateNumber }
+    val showWaiting = sort == SortMode.Watched && waiting.isNotEmpty()
+    var adding by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader(
@@ -210,12 +236,30 @@ private fun PlateTimeline(
             recordingSince = recordingSince,
             onBack = onBack,
         ) {
+            IconButton(onClick = { adding = true }) {
+                Icon(Icons.Filled.Add, contentDescription = "Watch for a plate")
+            }
             IconButton(onClick = {
                 searching = !searching
                 if (!searching) query = ""
             }) {
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
+        }
+
+        if (adding) {
+            AddWatchDialog(
+                onAdd = { text ->
+                    if (onAddWatch(text)) {
+                        adding = false
+                        sort = SortMode.Watched
+                        true
+                    } else {
+                        false
+                    }
+                },
+                onDismiss = { adding = false },
+            )
         }
 
         if (searching) {
@@ -226,7 +270,7 @@ private fun PlateTimeline(
             )
         }
 
-        if (plates.isNotEmpty()) {
+        if (plates.isNotEmpty() || watches.isNotEmpty()) {
             Row(
                 Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -238,19 +282,48 @@ private fun PlateTimeline(
         }
 
         when {
-            plates.isEmpty() -> EmptyState(
+            plates.isEmpty() && !showWaiting -> EmptyState(
                 "No plates yet",
-                "Start recording and point the camera at a vehicle, or scan a photo.",
+                "Start recording and point the camera at a vehicle, or scan a photo. " +
+                    "Tap + to get an alert for a plate you haven't seen yet.",
             )
-            entries.isEmpty() && sort == SortMode.Watched && needle.isEmpty() -> EmptyState(
+            entries.isEmpty() && !showWaiting && sort == SortMode.Watched && needle.isEmpty() -> EmptyState(
                 "No watched plates",
-                "Tap the bell on a plate to get an alert whenever it's seen again.",
+                "Tap the bell on a plate, or + to watch for a plate you haven't seen yet.",
             )
-            entries.isEmpty() -> EmptyState("No matches", "No saved plate contains \"$needle\".")
+            entries.isEmpty() && !showWaiting ->
+                EmptyState("No matches", "No saved plate contains \"$needle\".")
             else -> LazyColumn(
                 contentPadding = PaddingValues(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
+                if (showWaiting) {
+                    item(key = "waiting_header") {
+                        Text(
+                            "WAITING FOR",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(start = 34.dp, top = 6.dp, bottom = 2.dp),
+                        )
+                    }
+                    items(waiting, key = { "w_" + it.plateNumber }) { w ->
+                        WaitingRow(w, onRemove = { onRemoveWatch(w.plateNumber) })
+                    }
+                    if (entries.isNotEmpty()) {
+                        item(key = "seen_header") {
+                            Text(
+                                "SEEN",
+                                color = Muted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(start = 34.dp, top = 12.dp, bottom = 2.dp),
+                            )
+                        }
+                    }
+                }
                 itemsIndexed(
                     entries,
                     key = { _, e -> if (e is Entry.Item) e.plate.id else "d_" + (e as Entry.Day).label },
@@ -379,6 +452,104 @@ private fun PlateRow(
             modifier = Modifier.padding(end = 8.dp).size(20.dp),
         )
     }
+}
+
+/** A typed-in plate that hasn't been seen yet; tap the bell to stop watching for it. */
+@Composable
+private fun WaitingRow(watch: WatchEntity, onRemove: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 34.dp, end = 8.dp)
+            .height(44.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                watch.plateNumber,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1,
+            )
+            Text(
+                "Not seen yet · added ${SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(watch.createdAt))}",
+                color = Muted,
+                fontSize = 12.sp,
+                maxLines = 1,
+            )
+        }
+        WatchButton(watched = true, onClick = onRemove)
+    }
+}
+
+/** Type a plate number to be alerted when it's first seen. */
+@Composable
+private fun AddWatchDialog(onAdd: (String) -> Boolean, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Watch for a plate") },
+        text = {
+            Column {
+                Text(
+                    "You'll get an alert the first time this plate is seen.",
+                    color = Muted,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(FieldColor)
+                        .border(1.dp, if (error) RecordRed else LineColor, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (text.isEmpty()) Text("e.g. ABC1234", color = Muted, fontSize = 16.sp)
+                    BasicTextField(
+                        value = text,
+                        onValueChange = {
+                            text = it.uppercase().take(12)
+                            error = false
+                        },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color.White, fontSize = 18.sp,
+                            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                        ),
+                        cursorBrush = SolidColor(Accent),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Characters,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { error = !onAdd(text) }),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    )
+                }
+                if (error) {
+                    Text(
+                        "Enter 2–10 letters or numbers.",
+                        color = RecordRed,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { error = !onAdd(text) }) { Text("Watch") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 /** Bell: filled amber when the plate is on the watch list. */

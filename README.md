@@ -52,6 +52,8 @@ Images are stored in the app's private storage (`files/plate_crops/`); the datab
 ### Watch list
 Tap the bell on any plate (in the list or on its detail page) to watch it. When a watched plate is seen again the phone vibrates, an amber banner appears over everything, and a notification with the car photo is posted (Android 13+ asks for notification permission the first time). Use the **Watched** filter on the Plates page to see only watched plates.
 
+To watch for a plate you **haven't seen yet**, tap **+** on the Plates page and type the plate number. It's listed under *Waiting for* in the Watched view; the first time it's seen (allowing look-alike characters such as 0/O), you get the alert and it becomes a normal watched plate. Typing a plate you've already saved just turns on its bell.
+
 ### Tuning in code
 - **Save timing:** `agreeReads` (matching reads needed to save), `minReads`, `settleMs`, `maxWaitMs` in `PlateTracker.kt`.
 - **Plate crop margin:** `PLATE_PAD_X` / `PLATE_PAD_Y` in `scan/PlateEngine.kt`.

@@ -49,3 +49,10 @@ data class SightingEntity(
     /** Text exactly as the recogniser read it, before normalisation (e.g. "ABC-1234"). */
     val rawText: String,
 )
+
+/** A plate number to alert on that hasn't been seen yet (typed in on the Plates page). */
+@Entity(tableName = "watches")
+data class WatchEntity(
+    @PrimaryKey val plateNumber: String,
+    val createdAt: Long,
+)

@@ -257,6 +257,30 @@ class PlateViewModel(app: Application) : AndroidViewModel(app) {
         analyzer.vehicleScale = scale
     }
 
+    /** Typed-in watches for plates not seen yet. */
+    val watches: StateFlow<List<com.example.platescanner.data.WatchEntity>> = repository.watches
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Alert for [input] whenever it's seen. If it matches a saved plate (allowing look-alike
+     * characters) that plate is watched; otherwise it's kept as a "waiting for" watch.
+     * @return false if [input] isn't a usable plate number.
+     */
+    fun addWatch(input: String): Boolean {
+        val plate = PlateTextFilter.normalize(input)
+        if (plate.length !in 2..10) return false
+        val folded = PlateTracker.fold(plate)
+        val existing = plates.value.firstOrNull { PlateTracker.fold(it.plateNumber) == folded }
+        viewModelScope.launch {
+            if (existing != null) repository.setWatched(existing.id, true) else repository.addWatch(plate)
+        }
+        return true
+    }
+
+    fun removeWatch(plateNumber: String) {
+        viewModelScope.launch { repository.removeWatch(plateNumber) }
+    }
+
     fun setWatched(plateId: Long, watched: Boolean) {
         viewModelScope.launch { repository.setWatched(plateId, watched) }
     }

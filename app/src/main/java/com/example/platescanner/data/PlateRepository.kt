@@ -2,6 +2,7 @@ package com.example.platescanner.data
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.example.platescanner.scan.PlateTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -16,6 +17,17 @@ class PlateRepository(context: Context) {
 
     val plates: Flow<List<PlateEntity>> = dao.observePlates()
 
+    /** Plates to alert on that haven't been seen yet. */
+    val watches: Flow<List<WatchEntity>> = dao.observeWatches()
+
+    suspend fun addWatch(plateNumber: String) = withContext(Dispatchers.IO) {
+        dao.insertWatch(WatchEntity(plateNumber, System.currentTimeMillis()))
+    }
+
+    suspend fun removeWatch(plateNumber: String) = withContext(Dispatchers.IO) {
+        dao.deleteWatch(plateNumber)
+    }
+
     fun plate(id: Long): Flow<PlateEntity?> = dao.observePlate(id)
 
     fun sightings(plateId: Long): Flow<List<SightingEntity>> = dao.observeSightings(plateId)
@@ -28,7 +40,16 @@ class PlateRepository(context: Context) {
             FileOutputStream(plateFile).use { crop.compress(Bitmap.CompressFormat.JPEG, 92, it) }
             val vehicleFile = File(imageDir, "${plateNumber}_${timestamp}_vehicle.jpg")
             FileOutputStream(vehicleFile).use { vehicle.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-            dao.recordSighting(plateNumber, rawText, timestamp, plateFile.absolutePath, vehicleFile.absolutePath)
+            // A typed-in watch matching this plate (allowing look-alike characters) turns into a
+            // watched plate now that it has been seen.
+            val folded = PlateTracker.fold(plateNumber)
+            val watch = dao.allWatches().firstOrNull { PlateTracker.fold(it.plateNumber) == folded }
+            val result = dao.recordSighting(
+                plateNumber, rawText, timestamp, plateFile.absolutePath, vehicleFile.absolutePath,
+                markWatched = watch != null,
+            )
+            if (watch != null) dao.deleteWatch(watch.plateNumber)
+            result
         }
 
     suspend fun delete(plateId: Long) = withContext(Dispatchers.IO) {

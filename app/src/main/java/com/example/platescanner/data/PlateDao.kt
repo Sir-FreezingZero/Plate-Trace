@@ -2,6 +2,7 @@ package com.example.platescanner.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -12,6 +13,18 @@ data class SaveResult(val isNew: Boolean, val watched: Boolean)
 
 @Dao
 abstract class PlateDao {
+
+    @Query("SELECT * FROM watches ORDER BY createdAt DESC")
+    abstract fun observeWatches(): Flow<List<WatchEntity>>
+
+    @Query("SELECT * FROM watches")
+    abstract suspend fun allWatches(): List<WatchEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertWatch(watch: WatchEntity)
+
+    @Query("DELETE FROM watches WHERE plateNumber = :plateNumber")
+    abstract suspend fun deleteWatch(plateNumber: String)
 
     @Query("UPDATE plates SET watched = :watched WHERE id = :id")
     abstract suspend fun setWatched(id: Long, watched: Boolean)
@@ -61,6 +74,7 @@ abstract class PlateDao {
         timestamp: Long,
         imagePath: String,
         vehicleImagePath: String?,
+        markWatched: Boolean = false,
     ): SaveResult {
         val existing = findByNumber(number)
         val plateId: Long
@@ -74,6 +88,7 @@ abstract class PlateDao {
                     sightingCount = 1,
                     latestImagePath = imagePath,
                     latestVehicleImagePath = vehicleImagePath,
+                    watched = markWatched,
                 )
             )
             isNew = true
@@ -84,6 +99,7 @@ abstract class PlateDao {
                     sightingCount = existing.sightingCount + 1,
                     latestImagePath = imagePath,
                     latestVehicleImagePath = vehicleImagePath,
+                    watched = existing.watched || markWatched,
                 )
             )
             plateId = existing.id
@@ -98,7 +114,7 @@ abstract class PlateDao {
                 rawText = rawText,
             )
         )
-        return SaveResult(isNew = isNew, watched = existing?.watched == true)
+        return SaveResult(isNew = isNew, watched = existing?.watched == true || markWatched)
     }
 
     @Query("DELETE FROM sightings")

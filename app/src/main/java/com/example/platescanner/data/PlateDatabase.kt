@@ -8,14 +8,24 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [PlateEntity::class, SightingEntity::class],
-    version = 3,
+    entities = [PlateEntity::class, SightingEntity::class, WatchEntity::class],
+    version = 4,
     exportSchema = true,
 )
 abstract class PlateDatabase : RoomDatabase() {
     abstract fun plateDao(): PlateDao
 
     companion object {
+        /** v4: watches for plates not seen yet. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `watches` (`plateNumber` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`plateNumber`))"
+                )
+            }
+        }
+
         /** v3: watch list. */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -39,7 +49,7 @@ abstract class PlateDatabase : RoomDatabase() {
                     context.applicationContext,
                     PlateDatabase::class.java,
                     "plates.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }
