@@ -49,6 +49,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalFocusManager
@@ -545,9 +547,9 @@ private fun ToggleRow(
     ) {
         RowText(title, description, monospaceTitle, Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        // Compact switch: drawn at 80% and kept to 26dp of row height (the row itself is the
-        // tap target, so the switch doesn't need its own 48dp touch area).
-        Box(Modifier.height(26.dp), contentAlignment = Alignment.Center) {
+        // Compact switch: drawn at 80% (≈26dp tall, same as the pills) and kept to 26dp of row
+        // height (the row itself is the tap target). Right-aligned with the pills.
+        Box(Modifier.height(26.dp), contentAlignment = Alignment.CenterEnd) {
             Switch(
                 checked = checked,
                 onCheckedChange = onChange,
@@ -558,7 +560,12 @@ private fun ToggleRow(
                     disabledCheckedThumbColor = Color.Black,
                     disabledCheckedTrackColor = Accent,
                 ),
-                modifier = Modifier.scale(0.8f),
+                // Shrink toward the right edge so the switch lines up with the pills below.
+                modifier = Modifier.graphicsLayer {
+                    scaleX = 0.8f
+                    scaleY = 0.8f
+                    transformOrigin = TransformOrigin(1f, 0.5f)
+                },
             )
         }
     }
