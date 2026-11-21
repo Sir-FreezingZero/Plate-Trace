@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -63,6 +64,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,6 +110,18 @@ private val PillBg = Color.White.copy(alpha = 0.08f)
  * corner radius is 11 + 8 = 19dp — so a control in a card's corner is concentric with it.
  */
 private val CardShape = RoundedCornerShape(ControlRadius + CardPad)
+
+/**
+ * Row titles drop the empty line-height space above the first line, so the name sits closer to
+ * the top of its row (and card) without moving the controls.
+ */
+private val TitleStyle = TextStyle(
+    lineHeight = 16.sp,
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Bottom,
+        trim = LineHeightStyle.Trim.FirstLineTop,
+    ),
+)
 
 /** Slider with a round thumb the same height as the other controls (22dp). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -524,6 +538,7 @@ private fun RowText(
             fontWeight = if (monospaceTitle) FontWeight.Bold else FontWeight.Medium,
             fontFamily = if (monospaceTitle) FontFamily.Monospace else FontFamily.Default,
             maxLines = 1,
+            style = LocalTextStyle.current.merge(TitleStyle),
         )
         if (description != null) {
             Text(description, color = Muted, fontSize = 11.sp, lineHeight = 14.sp)
@@ -805,7 +820,7 @@ private fun ChoiceRow(
 ) {
     Column(Modifier.fillMaxWidth().then(RowPadding).padding(vertical = CardPad)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = LocalTextStyle.current.merge(TitleStyle), modifier = Modifier.weight(1f))
             // Pill track with a pill-shaped selected option inset 2dp (concentric).
             Row(
                 Modifier
