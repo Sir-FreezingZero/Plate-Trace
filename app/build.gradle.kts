@@ -16,6 +16,17 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        // Project-wide debug key (the standard public debug password), so APKs built on GitHub
+        // and in Android Studio share a signature and install over each other as updates.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
